@@ -314,7 +314,6 @@ function fcverw_admin()
 
 // a. Kontinente
 // a1. Alle Kontinente anzeigen lassen
-
         if ($mybb->input['action'] == "kontinente")
         {
             $page->add_breadcrumb_item('&Uuml;bersicht aller Kontinente');
@@ -521,7 +520,6 @@ function fcverw_admin()
 
 // a. Kontinente
 // a4. Kontinent löschen
-
         if ($mybb->input['action'] == "del_kontinent")
         {
             $kid = (int)$mybb->input['kid'];
@@ -552,7 +550,6 @@ function fcverw_admin()
 
 // b. Regionen
 // b1. Alle Regionen anzeigen
-
         if ($mybb->input['action'] == "regionen")
         {
             $page->add_breadcrumb_item('&Uuml;bersicht aller Regionen');
@@ -710,11 +707,124 @@ function fcverw_admin()
                 $form->output_submit_wrapper($button);
                 $form->end();
             }   
-        }
+        } // Ende Region anlegen
 
 
 // b. Regionen
 // b3. Region editieren
+        if ($mybb->input['action'] == "edit_region")
+        {
+            // Eintrag machen
+            if ($mybb->request_method == 'post' && $mybb->input['rname'] != '')
+            {
+                $update_query = array(
+                    'rkid' => (int)$mybb->input['rkid'],
+                    'rname' => htmlspecialchars_uni($mybb->input['rname']),
+                    'rbeschr' => htmlspecialchars_uni($mybb->input['rbeschr'])
+                );
+
+                if ($db->update_query("laender_regionene", $update_query, "rid = ".(int)$mybb->input['rid']))
+                {
+                    redirect("admin/index.php?module=config-fcverw&action=regionen");
+                }
+
+            }
+            else
+            {
+                // Formular anzeigen
+                // Neues Tab kreieren, das nur während des Editierens vorhanden ist.
+                $sub_tabs['edit_region'] = array(
+                    'title' => 'Region editieren',
+                    'link' => 'index.php?module=config-fcverw&amp;action=edit_region&amp;rid='.$mybb->input['rid'],
+                    'description' => 'Editieren einer bestehenden Region'
+                );
+
+                $page->add_breadcrumb_item('Region editieren');
+                $page->output_header('L&auml;nderverwaltung - Region editieren');
+
+                // which tab is selected? here: edit_region - der ist NICHT permanent!
+                $page->output_nav_tabs($sub_tabs, 'edit_koregion');
+
+                $form = new Form("index.php?module=config-fcverw&amp;action=edit_region", "post", "", 1);
+                $form_container = new FormContainer('Region editieren');
+                
+                // ID mitgeben über verstecktes Feld
+                echo $form->generate_hidden_field('rid', $mybb->input['rid']);
+
+                // Daten holen
+                $dataget = $db->simple_select("laender_regionen", "*", "rid = ".$mybb->input['rid']);
+                $data = $db->fetch_array($dataget);
+
+                // Fehlermeldung ausgeben, wenn Name nicht ausgefüllt
+                if ((!$mybb->input['rname'] || $mybb->input['rname'] == '') && $mybb->request_method == 'post')
+                {
+                    $l_fehler = " <b><font color='#ff0000'>Der Regionenname muss ausgef&uuml;llt sein!</font></b>";
+                    // Daten überschreiben
+                    $data['rname'] = $mybb->input['rname'];
+                    $data['rbeschr'] = $mybb->input['rbeschr'];
+                    $data['rkid'] = $mybb->input['rkid'];
+                }
+                // Fehlermeldung, wenn Kontinent nicht augefüllt
+                if ((!$mybb->input['rkid'] || $mybb->input['rkid'] == '' || $mybb->input['rkid'] == '0') && $mybb->request_method == 'post')
+                {
+                    $k_fehler = " <b><font color='#ff0000'>Es muss ein Kontinent ausgew&auml;hlt werden!</font></b>";
+                    // Daten überschreiben
+                    $data['rname'] = $mybb->input['rname'];
+                    $data['rbeschr'] = $mybb->input['rbeschr'];
+                    $data['rkid'] = $mybb->input['rkid'];
+                }
+
+
+                // der name
+                $form_container->output_row(
+                    'Name der Region'.$l_fehler,
+                    'Vollst&auml;ndiger Name der Region',
+                    $form->generate_text_box(
+                        'rname',
+                        htmlspecialchars_uni($data['rname']),
+                        array('style' => 'width: 200px;')
+                    )
+                );
+
+                // der zugeordnete Kontinent
+                // Kontinente auslesen
+                $kontsel = $db->simple_select("laender_kontinente", "*");
+                $kontinente = array();
+                $kontinente[0] = "Bitte w&auml;hlen!";
+                
+                while ($kontdata = $db->fetch_array($kontsel))
+                {
+                    $kontinente[$kontdata['kid']] = htmlspecialchars_uni($kontdata['kname']);
+                }
+                
+                $form_container->output_row(
+                    'Kontinent'.$k_fehler,
+                    'Zu welchem Kontinent geh&ouml;rt die Region?',
+                    $form->generate_select_box(
+                        'rkid',
+                        $kontinente,
+                        $data['rkid'], 
+                        array('style' => 'width: 200px;')
+                    )
+                );
+
+
+                // Informationstext
+                $form_container->output_row(
+                    'Beschreibung',
+                    'Gibt es interessante Informationen &uuml;ber die Region?',
+                    $form->generate_text_area(
+                        'rbeschr',
+                        $db->escape_string($data['rbeschr'])
+                    )
+                );
+
+                $form_container->end();
+                $button[] = $form->generate_submit_button('Region editieren');
+                $form->output_submit_wrapper($button);
+                $form->end();
+            }
+        } // Ende Editieren Kontinent
 
 
 // b. Regionen
