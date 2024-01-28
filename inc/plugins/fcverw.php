@@ -553,6 +553,65 @@ function fcverw_admin()
 // b. Regionen
 // b1. Alle Regionen anzeigen
 
+        if ($mybb->input['action'] == "regionen")
+        {
+            $page->add_breadcrumb_item('&Uuml;bersicht aller Regionen');
+            $page->output_header('L&auml;nderverwaltung - &Uuml;bersicht aller regionen');
+
+            // Welches Tab ist ausgewählt?
+            $page->output_nav_tabs($sub_tabs, 'regionen');
+
+            // Tabelle kreieren - Headerzeile
+            $form = new Form("index.php?module=config-fcverw", "post");
+            $form_container = new FormContainer('Alle Regionen');
+            $form_container->output_row_header('ID', array("class" => "align_center", "width" => "3%"));
+            $form_container->output_row_header('Regionenname', array("class" => "align_center", "width" => "15%"));
+            $form_container->output_row_header('Beschreibung', array("class" => "align_center"));
+            $form_container->output_row_header('Kontinent', array("class" => "align_center", "width" => "15%"));
+            $form_container->output_row_header('L&auml;nder', array("class" => "align_center", "width" => "5%"));
+            $form_container->output_row_header('Optionen', array("class" => "align_center", "width" => "15%"));
+
+            // Hier werden die Regionen ausgelesen
+            $fc_regsel = $db->write_query("
+                SELECT 
+                    r.*, k.* 
+                FROM 
+                    ".TABLE_PREFIX."laender_regionen r 
+                LEFT JOIN 
+                ORDER BY rname");
+                
+                
+            while ($row = $db->fetch_array($fc_regsel))
+            {
+                // Auslesen der Anzahl der Regionen und Länder
+                $regionen = $db->num_rows($db->simple_select("laender_regionen", "rid", "rkid = ".$row['kid']));
+                $laender = $db->num_rows($db->simple_select("laender", "landid", "lkid = ".$row['kid']));
+
+                $form_container->output_cell($row['kid'], array("class" => "align_center"));
+                $form_container->output_cell("<b>".$row['kname']."</b>");
+                $form_container->output_cell($row['kbeschr']);
+                $form_container->output_cell($regionen, array("class" => "align_center"));
+                $form_container->output_cell($laender, array("class" => "align_center"));
+
+                // Optionen-Fach basteln
+                //erst pop up dafür bauen - danke an @Risuena
+                $popup = new PopupMenu("fcverw_{$row['kid']}", "Optionen");
+                $popup->add_item(
+                    "Editieren",
+                    "index.php?module=config-fcverw&amp;action=edit_kontinent&amp;kid={$row['kid']}"
+                );
+                $popup->add_item(
+                    "L&ouml;schen",
+                    "index.php?module=config-fcverw&amp;action=del_kontinent&amp;kid={$row['kid']}"
+                );
+                $form_container->output_cell($popup->fetch(), array("class" => "align_center"));
+
+                $form_container->construct_row(); // Reihe erstellen
+            }
+
+            $form_container->end();
+            $form->end();
+        } // Ende der Kontinentübersicht
 
 // b. Regionen
 // b2. Region editieren
