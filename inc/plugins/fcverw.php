@@ -723,7 +723,7 @@ function fcverw_admin()
                     'rbeschr' => htmlspecialchars_uni($mybb->input['rbeschr'])
                 );
 
-                if ($db->update_query("laender_regionene", $update_query, "rid = ".(int)$mybb->input['rid']))
+                if ($db->update_query("laender_regionen", $update_query, "rid = ".(int)$mybb->input['rid']))
                 {
                     redirect("admin/index.php?module=config-fcverw&action=regionen");
                 }
@@ -743,7 +743,7 @@ function fcverw_admin()
                 $page->output_header('L&auml;nderverwaltung - Region editieren');
 
                 // which tab is selected? here: edit_region - der ist NICHT permanent!
-                $page->output_nav_tabs($sub_tabs, 'edit_koregion');
+                $page->output_nav_tabs($sub_tabs, 'edit_region');
 
                 $form = new Form("index.php?module=config-fcverw&amp;action=edit_region", "post", "", 1);
                 $form_container = new FormContainer('Region editieren');
