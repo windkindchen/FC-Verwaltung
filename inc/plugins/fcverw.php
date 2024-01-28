@@ -12,7 +12,7 @@ function fcverw_info()
     return array(
         "name"			=> "L&auml;nderverwaltung",
         "description"	=> "Dieser Plugin erlaubt die Verwaltung von L&auml;ndern inkl. Erstellung, Diplomatie, Informationen.",
-	    "website"		=> "https://github.com/windkindchen/FC-Verwaltung",
+        "website"		=> "https://github.com/windkindchen/FC-Verwaltung",
         "author"		=> "May (windkindchen)",
         "authorsite"	=> "https://github.com/windkindchen",
         "version"		=> "2.0",
@@ -139,47 +139,49 @@ function fcverw_install()
 
 // Prüfen, ob Plugin installiert
 function fcverw_is_installed()
-  {
+{
     global $db;
 
     if ($db->table_exists("laender"))
     {
-      return true;
+        return true;
     }
-  }
+}
 
 
-  function fcverw_uninstall()
-  {
+// Plugin deinstallieren
+function fcverw_uninstall()
+{
     global $db;
+    
     // Löschen der Datenbanktabellen
     if ($db->table_exists("laender"))
     {
-      $db->drop_table("laender");
+        $db->drop_table("laender");
     }
     if ($db->table_exists("laender_diplomatie"))
     {
-      $db->drop_table("laender_diplomatie");
+        $db->drop_table("laender_diplomatie");
     }
     if ($db->table_exists("laender_info"))
     {
-      $db->drop_table("laender_info");
+        $db->drop_table("laender_info");
     }
     if ($db->table_exists("laender_kontinente"))
     {
-      $db->drop_table("laender_kontinente");
+        $db->drop_table("laender_kontinente");
     }
     if ($db->table_exists("laender_regionen"))
     {
-      $db->drop_table("laender_regionen");
+        $db->drop_table("laender_regionen");
     }
     if ($db->table_exists("laender_verwandt"))
     {
-      $db->drop_table("laender_verwandt");
+        $db->drop_table("laender_verwandt");
     }
-		if ($db->table_exists("laender_personen"))
+    if ($db->table_exists("laender_personen"))
     {
-      $db->drop_table("laender_personen");
+        $db->drop_table("laender_personen");
     }
 
 
@@ -188,24 +190,28 @@ function fcverw_is_installed()
     // Löschen der templates
 
     // Löschen des CSS
-  }
+}
 
 
-  function fcverw_activate()
-  {
+// Aktivieren und damit veröffentlichen
+function fcverw_activate()
+{
     global $db, $cache;
 
     // Links einbinden etc.
+    
+    // im UserCP
+    // im Header zur Liste
+    // ...
+}
 
-  }
-
-
-  function fcverw_deactivate()
-  {
+// deaktivieren und damit verstecken
+function fcverw_deactivate()
+{
     global $db, $cache;
 
     // Änderungen an Templates rückgängig machen
-  }
+}
 
 
 /* **********************************************************************************************
@@ -219,85 +225,90 @@ function fcverw_is_installed()
           Part 01: ADMIN-CP
    *********************************************** */
 
-   #######################################
-   ### // creates link in acp -> users ###
-   #######################################
+#######################################
+### // creates link in acp -> users ###
+#######################################
 
-   	$plugins->add_hook('admin_config_menu', 'fcverw_admin_config_menu');
-   	function fcverw_admin_config_menu(&$sub_menu)
-   	{
-
-   	    $sub_menu[] = array(
-   	        'id' => 'fcverw',
-   	        'title' => 'L&auml;nderverwaltung',
-   	        'link' => 'index.php?module=config-fcverw'
-   	    );
-   	}
-
+$plugins->add_hook('admin_config_menu', 'fcverw_admin_config_menu');
+function fcverw_admin_config_menu(&$sub_menu)
+{
+    $sub_menu[] = array(
+        'id' => 'fcverw',
+        'title' => 'L&auml;nderverwaltung',
+        'link' => 'index.php?module=config-fcverw'
+    );
+}
 
 
-    #################################################
-    ### // hook actions for fcverw management ###
-    #################################################
 
-    $plugins->add_hook('admin_config_action_handler', 'fcverw_admin_config_action_handler');
-    function fcverw_admin_config_action_handler(&$actions)
+#############################################
+### // hook actions for fcverw management ###
+#############################################
+
+$plugins->add_hook('admin_config_action_handler', 'fcverw_admin_config_action_handler');
+function fcverw_admin_config_action_handler(&$actions)
+{
+    $actions['fcverw'] = array('active' => 'fcverw', 'file' => 'fcverw');
+}
+
+
+###################################
+### // Admin-Funktionen basteln ###
+### // a. Kontinente            ###
+### // b. Regionen              ###
+### // c. Länder                ###
+###################################
+
+$plugins->add_hook('admin_load', 'fcverw_admin');
+function fcverw_admin()
+{
+    global $mybb, $db, $lang, $page, $action_file, $run_module, $form, $land, $i;
+
+    if ($page->active_action != 'fcverw')
     {
-        $actions['fcverw'] = array('active' => 'fcverw', 'file' => 'fcverw');
+   	    return false;
     }
 
+// Wenn Das Module config ist und das Action File fcverw, 
+// dann beginnt die Magic.
+    if ($run_module == 'config' && $action_file == 'fcverw')
+    {
+        $page->add_breadcrumb_item('L&auml;nderverwaltung', 'index.php?module=config-fcverw');
 
 
-    $plugins->add_hook('admin_load', 'fcverw_admin');
-  	function fcverw_admin()
-  	{
-  		global $mybb, $db, $lang, $page, $action_file, $run_module, $form, $land, $i;
-
-
-  		if ($page->active_action != 'fcverw')
-  		{
-          	return false;
-      }
-
-
-
-      if ($run_module == 'config' && $action_file == 'fcverw')
-  		{
-      		$page->add_breadcrumb_item('L&auml;nderverwaltung', 'index.php?module=config-fcverw');
-
-
-  // now let us create the tabs (tab, tab, tib)
-          $sub_tabs['laender'] = array(
+// Die Standard-Tabs (permanent) des Moduls konfigurieren.
+// Für die Bearbeitung und einzelne Unterpunkte gibt es extra welche
+        $sub_tabs['laender'] = array(
             'title'	=> 'Alle L&auml;nder',
             'link'	=> 'index.php?module=config-fcverw',
             'description'   => '&Uuml;bersicht aller L&auml;nder<br />
-  					                   <img src="fcverw/frei.png"> Land frei; <img src="fcverw/vergeben.png"> Land vergeben; <img src="fcverw/error.png"> Land vergeben ohne Verantwortlichen'
-          );
-          $sub_tabs['add_land'] = array(
+  			<img src="fcverw/frei.png"> Land frei; <img src="fcverw/vergeben.png"> Land vergeben; <img src="fcverw/error.png"> Land vergeben ohne Verantwortlichen'
+        );
+        $sub_tabs['add_land'] = array(
             'title' => 'Land anlegen',
-  				  'link' => 'index.php?module=config-fcverw&amp;action=add_land',
-  					'description' => 'Anlegen eines neuen Landes'
-  				);
-          $sub_tabs['regionen'] = array(
+            'link' => 'index.php?module=config-fcverw&amp;action=add_land',
+            'description' => 'Anlegen eines neuen Landes'
+        );
+        $sub_tabs['regionen'] = array(
             'title' => 'Regionen',
-  				  'link' => 'index.php?module=config-fcverw&amp;action=regionen',
-  					'description' => 'Übersicht der Regionen'
-  				);
-          $sub_tabs['add_region'] = array(
+            'link' => 'index.php?module=config-fcverw&amp;action=regionen',
+            'description' => 'Übersicht der Regionen'
+        );
+        $sub_tabs['add_region'] = array(
             'title' => 'Region anlegen',
-  				  'link' => 'index.php?module=config-fcverw&amp;action=add_region',
-  					'description' => 'Anlegen eines neuen Landes'
-  				);
-          $sub_tabs['kontinente'] = array(
+            'link' => 'index.php?module=config-fcverw&amp;action=add_region',
+            'description' => 'Anlegen eines neuen Landes'
+        );
+        $sub_tabs['kontinente'] = array(
             'title' => 'Kontinente',
             'link' => 'index.php?module=config-fcverw&amp;action=kontinente',
             'description' => 'Übersicht der Kontinente'
-          );
-          $sub_tabs['add_kontinent'] = array(
+        );
+        $sub_tabs['add_kontinent'] = array(
             'title' => 'Kontinent anlegen',
-  				  'link' => 'index.php?module=config-fcverw&amp;action=add_kontinent',
-  					'description' => 'Anlegen eines neuen Kontinents'
-  				);
+            'link' => 'index.php?module=config-fcverw&amp;action=add_kontinent',
+            'description' => 'Anlegen eines neuen Kontinents'
+        );
 
 
 
