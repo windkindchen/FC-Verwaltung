@@ -349,14 +349,14 @@ function fcverw_admin()
 
                 // Optionen-Fach basteln
                 //erst pop up dafür bauen - danke an @Risuena
-                $popup = new PopupMenu("fcverw_{$row['kid']}", "Optionen");
+                $popup = new PopupMenu("fcverw_".$row['kid'], "Optionen");
                 $popup->add_item(
                     "Editieren",
-                    "index.php?module=config-fcverw&amp;action=edit_kontinent&amp;kid={$row['kid']}"
+                    "index.php?module=config-fcverw&amp;action=edit_kontinent&amp;kid=".$row['kid']
                 );
                 $popup->add_item(
                     "L&ouml;schen",
-                    "index.php?module=config-fcverw&amp;action=del_kontinent&amp;kid={$row['kid']}"
+                    "index.php?module=config-fcverw&amp;action=del_kontinent&amp;kid=".$row['kid']
                 );
                 $form_container->output_cell($popup->fetch(), array("class" => "align_center"));
 
@@ -578,31 +578,35 @@ function fcverw_admin()
                 FROM 
                     ".TABLE_PREFIX."laender_regionen r 
                 LEFT JOIN 
-                ORDER BY rname");
+                    ".TABLE_PREFIX."laender_kontinente k 
+                ON 
+                    k.kid = r.rkid 
+                ORDER BY 
+                    k.kname, r.rname
+            ");
                 
                 
             while ($row = $db->fetch_array($fc_regsel))
             {
                 // Auslesen der Anzahl der Regionen und Länder
-                $regionen = $db->num_rows($db->simple_select("laender_regionen", "rid", "rkid = ".$row['kid']));
-                $laender = $db->num_rows($db->simple_select("laender", "landid", "lkid = ".$row['kid']));
+                $laender = $db->num_rows($db->simple_select("laender", "landid", "lrid = ".$row['rid']));
 
-                $form_container->output_cell($row['kid'], array("class" => "align_center"));
-                $form_container->output_cell("<b>".$row['kname']."</b>");
-                $form_container->output_cell($row['kbeschr']);
-                $form_container->output_cell($regionen, array("class" => "align_center"));
+                $form_container->output_cell($row['rid'], array("class" => "align_center"));
+                $form_container->output_cell("<b>".$row['rname']."</b>");
+                $form_container->output_cell($row['rbeschr']);
+                $form_container->output_cell($row['kname']);
                 $form_container->output_cell($laender, array("class" => "align_center"));
 
                 // Optionen-Fach basteln
                 //erst pop up dafür bauen - danke an @Risuena
-                $popup = new PopupMenu("fcverw_{$row['kid']}", "Optionen");
+                $popup = new PopupMenu("fcverw_".$row['rid'], "Optionen");
                 $popup->add_item(
                     "Editieren",
-                    "index.php?module=config-fcverw&amp;action=edit_kontinent&amp;kid={$row['kid']}"
+                    "index.php?module=config-fcverw&amp;action=edit_region&amp;rid=".$row['rid']
                 );
                 $popup->add_item(
                     "L&ouml;schen",
-                    "index.php?module=config-fcverw&amp;action=del_kontinent&amp;kid={$row['kid']}"
+                    "index.php?module=config-fcverw&amp;action=del_region&amp;rid=".$row['rid']
                 );
                 $form_container->output_cell($popup->fetch(), array("class" => "align_center"));
 
@@ -613,12 +617,108 @@ function fcverw_admin()
             $form->end();
         } // Ende der Kontinentübersicht
 
+
 // b. Regionen
-// b2. Region editieren
+// b2. Region anlegen
+        if ($mybb->input['action'] == "add_region")
+        {
+            // Wenn alle Pflichtangaben abgeschickt wurden, dann eintragen
+            if ($mybb->request_method == 'post' && $mybb->input['rname'] != '' && $mybb->input['rkid']!= '0')
+            {
+                $insert_query = array(
+                    'rkid' => (int)$mybb->input['rkid'],
+                    'rname' => htmlspecialchars_uni($mybb->input['rname']),
+                    'rbeschr' => htmlspecialchars_uni($mybb->input['rbeschr'])
+                );
+
+                if ($db->insert_query("laender_regionen", $insert_query))
+                {
+                    redirect("admin/index.php?module=config-fcverw&action=regionen");
+                }
+
+            }
+            else
+            {
+                // Wenn Regionenname leer, dann Fehldermeldung generieren!
+                
+                if ((!$mybb->input['rname'] || $mybb->input['rname'] == '') && $mybb->request_method == 'post')
+                {
+                    $l_fehler = " <b><font color='#ff0000'>Der Regionenname muss ausgef&uuml;llt sein!</font></b>";
+                }
+                // Wenn Regionenkontinent leer, dann Fehlermeldung generieren!
+                if ((!$mybb->input['rkid'] || $mybb->input['rkid'] == '' || $mybb->input['rkid'] == '0') && $mybb->request_method == 'post')
+                {
+                    $k_fehler = " <b><font color='#ff000'>Es muss ein Kontinent zugeordnet werden!</font></b>";
+                }
+
+                $page->add_breadcrumb_item('Region anlegen');
+                $page->output_header('L&auml;nderverwaltung - Region anlegen');
+
+                // which tab is selected? hier: add_region
+                $page->output_nav_tabs($sub_tabs, 'add_region');
+
+                // Neues Formular erstellen
+                $form = new Form("index.php?module=config-fcverw&amp;action=add_region", "post", "", 1);
+                $form_container = new FormContainer('Neue Region anlegen');
+
+                // der name
+                $form_container->output_row(
+                    'Name der Region'.$l_fehler,
+                    'Vollst&auml;ndiger Name der Region',
+                    $form->generate_text_box(
+                        'rname',
+                        htmlspecialchars_uni($mybb->input['rname']),
+                        array('style' => 'width: 200px;')
+                    )
+                );
+                
+                // der zugeordnete Kontinent
+                // Kontinente auslesen
+                $kontsel = $db->simple_select("laender_kontinente", "*");
+                $kontinente = array();
+                $kontinente[0] = "Bitte w&auml;hlen!";
+                
+                while ($kontdata = $db->fetch_array($kontsel))
+                {
+                    $kontinente[$kontdata['kid']] = htmlspecialchars_uni($kontdata['kname']);
+                }
+                
+                $form_container->output_row(
+                    'Kontinent'.$k_fehler,
+                    'Zu welchem Kontinent geh&ouml;rt die Region?',
+                    $form->generate_select_box(
+                        'rkid',
+                        $kontinente,
+                        $mybb->input['rkid'], 
+                        array('style' => 'width: 200px;')
+                    )
+                );
+
+                // Informationstext
+                $form_container->output_row(
+                    'Beschreibung',
+                    'Gibt es interessante Informationen &uuml;ber die Region?',
+                    $form->generate_text_area(
+                        'rbeschr',
+                        $db->escape_string($mybb->input['rbeschr'])
+                    )
+                );
+
+
+                $form_container->end();
+                $button[] = $form->generate_submit_button('Region anlegen');
+                $form->output_submit_wrapper($button);
+                $form->end();
+            }   
+        }
 
 
 // b. Regionen
-// b3. Region löschen
+// b3. Region editieren
+
+
+// b. Regionen
+// b4. Region löschen
 
 
 
