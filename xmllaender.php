@@ -1,23 +1,4 @@
 <?php
-/**
- * MyBB 1.8
- * Copyright 2014 MyBB Group, All Rights Reserved
- *
- * Website: http://www.mybb.com
- * License: http://www.mybb.com/about/license
- *
- */
-
-/**
- * The deal with this file is that it handles all of the XML HTTP Requests for MyBB.
- *
- * It contains a stripped down version of the MyBB core which does not load things
- * such as themes, who's online data, all of the language packs and more.
- *
- * This is done to make response times when using XML HTTP Requests faster and
- * less intense on the server.
- */
-
     define("IN_MYBB", 1);
     
     // We don't want visits here showing up on the Who's Online
