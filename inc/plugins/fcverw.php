@@ -38,7 +38,7 @@ function fcverw_install()
             `lreal` text NOT NULL,
             `lbesp` int(1) NOT NULL DEFAULT 0,
             `lstat` int(1) NOT NULL DEFAULT 0,
-            `luebergeordnet` int(15) NOT NULL,
+            `lparent` int(15) NOT NULL,
             `lverantwortl` int(15) NOT NULL,
             PRIMARY KEY (`landid`)
         )
@@ -222,8 +222,130 @@ function fcverw_deactivate()
 
 
 /* ***********************************************
+          Part 00: Get Global
+   *********************************************** */
+
+function fcverw_KonReg()
+{
+    global $db, $mybb, $konreg;
+    
+    $konreg  = $db->write_query("
+        SELECT 
+            r.rid, r.rname, r.rkid, k.kname, k.kid
+        FROM 
+            ".TABLE_PREFIX."laender_regionen r 
+        LEFT JOIN 
+            ".TABLE_PREFIX."laender_kontinente k 
+        ON 
+            k.kid = r.rkid 
+        ORDER BY 
+            k.kname, r.rname
+    ");
+        
+    return $konreg;
+}
+
+
+function fcverw_LandList($rid)
+{
+    global $db, $mybb, $landliste;
+    
+    $landliste = $db->query("
+        WITH RECURSIVE 
+            LandListe
+            (
+                landid, 
+                lname, 
+                lkuerzel, 
+                lart, 
+                lreal, 
+                lbesp, 
+                lstat, 
+                lparent, 
+                lverantw, 
+                Ebene, 
+                Path
+            )
+        AS 
+        (
+            SELECT 
+                landid, 
+                lname, 
+                lkuerzel, 
+                lart, 
+                lreal, 
+                lbesp, 
+                lstat, 
+                lparent, 
+                lverantw, 
+                0 AS Ebene, 
+                CAST(lname AS CHAR(2000))
+            FROM 
+                ".TABLE_PREFIX."laender
+            WHERE 
+                lrid = '".$rid."'
+                    AND 
+                lparent IS NULL 
+            
+            UNION ALL 
+            
+            SELECT 
+                l.landid, 
+                l.lname, 
+                l.lkuerzel, 
+                l.lart, 
+                l.lreal, 
+                l.lbesp, 
+                l.lstat, 
+                l.lparent, 
+                l.lverantw, 
+                la.Ebene + 1, 
+                CONCAT(la.path, ',', l.lname)
+            FROM 
+                LandListe AS la 
+            JOIN 
+                ".TABLE_PREFIX."laender AS l
+            ON 
+                la.landid = l.lparent
+        )
+        SELECT 
+            * 
+        FROM 
+            LandListe 
+        ORDER BY 
+            Path;
+    ");
+    
+    return $landliste;
+}
+
+
+function fcverw_UserSelect($ugroups)
+{
+    global $db, $mybb, $userselect;
+    
+    $userselect  = $db->write_query("
+        SELECT 
+            * 
+        FROM 
+            ".TABLE_PREFIX."users
+        WHERE 
+            usergroup IN (".$ugroups.") 
+        ORDER BY 
+            username
+    ");
+        
+    return $userselect;
+    
+}
+
+
+
+/* ***********************************************
           Part 01: ADMIN-CP
    *********************************************** */
+
+
 
 #######################################
 ### // creates link in acp -> users ###
@@ -258,6 +380,7 @@ function fcverw_admin_config_action_handler(&$actions)
 ### // b. Regionen              ###
 ### // c. Länder                ###
 ###################################
+
 
 $plugins->add_hook('admin_load', 'fcverw_admin');
 function fcverw_admin()
@@ -562,25 +685,13 @@ function fcverw_admin()
             $form = new Form("index.php?module=config-fcverw", "post");
             $form_container = new FormContainer('Alle Regionen');
             $form_container->output_row_header('ID', array("class" => "align_center", "width" => "3%"));
-            $form_container->output_row_header('Regionenname', array("class" => "align_center", "width" => "15%"));
+            $form_container->output_row_header('Regionenname', array("class" => "align_center", "width" => "25%"));
             $form_container->output_row_header('Beschreibung', array("class" => "align_center"));
-            $form_container->output_row_header('Kontinent', array("class" => "align_center", "width" => "15%"));
             $form_container->output_row_header('L&auml;nder', array("class" => "align_center", "width" => "5%"));
             $form_container->output_row_header('Optionen', array("class" => "align_center", "width" => "15%"));
 
             // Hier werden die Regionen ausgelesen
-            $fc_regsel = $db->write_query("
-                SELECT 
-                    r.*, k.* 
-                FROM 
-                    ".TABLE_PREFIX."laender_regionen r 
-                LEFT JOIN 
-                    ".TABLE_PREFIX."laender_kontinente k 
-                ON 
-                    k.kid = r.rkid 
-                ORDER BY 
-                    k.kname, r.rname
-            ");
+            $fc_regsel = fcverw_KonReg();
                 
                 
             while ($row = $db->fetch_array($fc_regsel))
@@ -589,9 +700,8 @@ function fcverw_admin()
                 $laender = $db->num_rows($db->simple_select("laender", "landid", "lrid = ".$row['rid']));
 
                 $form_container->output_cell($row['rid'], array("class" => "align_center"));
-                $form_container->output_cell("<b>".$row['rname']."</b>");
+                $form_container->output_cell("[".$row['kname']."] <b>".$row['rname']."</b>");
                 $form_container->output_cell($row['rbeschr']);
-                $form_container->output_cell($row['kname']);
                 $form_container->output_cell($laender, array("class" => "align_center"));
 
                 // Optionen-Fach basteln
@@ -612,7 +722,7 @@ function fcverw_admin()
 
             $form_container->end();
             $form->end();
-        } // Ende der Kontinentübersicht
+        } // Ende der Regionenübersicht
 
 
 // b. Regionen
@@ -637,7 +747,6 @@ function fcverw_admin()
             else
             {
                 // Wenn Regionenname leer, dann Fehldermeldung generieren!
-                
                 if ((!$mybb->input['rname'] || $mybb->input['rname'] == '') && $mybb->request_method == 'post')
                 {
                     $l_fehler = " <b><font color='#ff0000'>Der Regionenname muss ausgef&uuml;llt sein!</font></b>";
@@ -700,7 +809,6 @@ function fcverw_admin()
                         $db->escape_string($mybb->input['rbeschr'])
                     )
                 );
-
 
                 $form_container->end();
                 $button[] = $form->generate_submit_button('Region anlegen');
@@ -808,7 +916,6 @@ function fcverw_admin()
                     )
                 );
 
-
                 // Informationstext
                 $form_container->output_row(
                     'Beschreibung',
@@ -824,12 +931,28 @@ function fcverw_admin()
                 $form->output_submit_wrapper($button);
                 $form->end();
             }
-        } // Ende Editieren Kontinent
+        } // Ende Editieren Region
 
 
 // b. Regionen
 // b4. Region löschen
+        if ($mybb->input['action'] == "del_region")
+        {
+            $rid = (int)$mybb->input['rid'];
 
+            // Länder updaten
+            $update_laender = array(
+                'lrid' => "0"
+            );
+            $db->update_query("laender", $update_laender, "lrid = ".$rid);
+
+            // Eintrag löschen
+            if ($db->delete_query("laender_regionen", "rid = ".$rid))
+            {
+                redirect("admin/index.php?module=config-fcverw&action=regionen");
+            }
+
+        } // Ende Löschen Region
 
 
 
@@ -847,43 +970,330 @@ function fcverw_admin()
             // Grundgerüst
             $form = new Form("index.php?module=config-fcverw", "post");
             $form_container = new FormContainer('Alle L&auml;nder');
-            $form_container->output_row_header('ID');
-            $form_container->output_row_header('Landname');
-            $form_container->output_row_header('Landart');
-            $form_container->output_row_header('L&auml;nderinfos');
-            $form_container->output_row_header('Diplomatie');
-            $form_container->output_row_header('Verwandtschaften');
-            $form_container->output_row_header('Bewohner');
-            $form_container->output_row_header('Bearbeiten?');
-
-            // Hier werden die Lander ausgelesen
-            // und weitere Details
-
-
-          $form_container->end();
-          $form->end();
+            
+            $form_container->output_row_header('ID', array("class" => "align_center", "width" => "2%"));
+            $form_container->output_row_header('Landname', array("class" => "align_center", "colspan" => "2"));
+            $form_container->output_row_header('Landart', array("class" => "align_center", "width" => "15%"));
+            $form_container->output_row_header('L&auml;nderinfos', array("class" => "align_center", "width" => "15%"));
+            $form_container->output_row_header('Diplomatie', array("class" => "align_center", "width" => "15%"));
+            $form_container->output_row_header('Verwandtschaften', array("class" => "align_center", "width" => "15%"));
+            $form_container->output_row_header('Bewohner', array("class" => "align_center", "width" => "15%"));
+            
+            // Zunächst Kontinente und Regionen auslesen - um dann die jeweiligen Länder und Unterländer zu bekommen.
+            $select_query = fcverw_KonReg();
+            
+            while ($data = $db->fetch_array($select_query))
+            {
+                // Prüfen, ob überhaupt Ausgabe erforderlich
+                $lands = $db->simple_select("laender", "*", "lrid = ".$data['rid']." AND lstat = '0'", array('order_by' => 'lname'));
+                
+                if ($db->num_rows($lands) > '0')
+                {
+                    $form_container->output_cell($data['kname'].' &raquo; <b>'.$data['rname'].'</b>', array("colspan" => "8"));
+                    $form_container->construct_row(); // Reihe erstellen
+                    
+                    // Funktion der Länderauflistung aufrufen und nutzen
+                    $query = fcverw_LandList($data['rid']);
+                    
+                    while ($landdata = $db->fetch_array($query))
+                    {
+                        $trenner = str_repeat("-", $landdata['Ebene']);
+                        
+                        // Prüfen, ob Land bespielt
+                        if ($landdata['lbesp'] == '1')
+                        {
+                            // Prüfen, ob Spieler noch da
+                            $use = $db->simple_select("users", "username", "uid = ".$landdata['lverantw']);
+                            $count = $db->num_rows($use);
+                                
+                            if ($count == '1')
+                            {
+                                $image = '<img src="fcverw/vergeben.png" />';
+                            } 
+                            else
+                            {
+                                $image = '<img src="fcverw/error.png" />';
+                            } 
+                        }
+                        else 
+                        {
+                            $image = '<img src="fcverw/frei.png" />';
+                        }
+                        
+                        $form_container->output_cell($landdata['landid'], array("class" => "align_center"));
+                        $form_container->output_cell($image, array("width" => "1%"));
+                        $form_container->output_cell($trenner." ".$landdata['lname']." (".$landdata['lart'].")");
+                        $form_container->output_cell('ID');
+                        $form_container->output_cell('ID');
+                        $form_container->output_cell('ID');
+                        $form_container->output_cell('ID');
+                        $form_container->output_cell('ID');
+                        $form_container->construct_row(); // Reihe erstellen
+                    }
+                    
+                }
+            } 
+            $form_container->end();
+            $form->end();
         } // Ende der Startseite
 
 
-// c. Länder
-// c2. Land editieren
 
 // c. Länder
-// c3. Land löschen
+// c2. Land anlegen
+
+        if ($mybb->input['action'] == "add_land")
+        {
+            // Wenn alle Pflichtangaben abgeschickt wurden, dann eintragen
+            if ($mybb->request_method == 'post' && $mybb->input['lname'] != '' && $mybb->input['lrid']!= '0' && ($mybb->input['lstat'] == '0' || ($mybb->input['lstat'] == '1' && $mybb->input['lparent'] != '0')))
+            {
+                // bei untergeordneten Ländern zur Sicherheit die richtige Region-ID raussuchen:
+                if ($mybb->input['lstat'] == '1')
+                {
+                    $rsele = $db->simple_select("laender", "lrid", "landid = ".$mybb->input['lparent']);
+                    $mybb->input['lrid'] = $db->fetch_field($rsele, 'lrid');
+                }
+                
+                // Wähle die Kontinent-ID:
+                $rsel = $db->simple_select("laender_regionen", "rkid", "rid = ".$mybb->input['lrid'], array('limit' => '1'));
+                $lkid = $db->fetch_field($rsel, 'rkid');
+
+                $insert_query = array(
+                    'lkid' => (int)$lkid,
+                    'lrid' => (int)$mybb->input['lrid'], 
+                    'lname' => htmlspecialchars_uni($mybb->input['lname']),
+                    'lkuerzel' => htmlspecialchars_uni($mybb->input['lkuerzel']),
+                    'lart' => htmlspecialchars_uni($mybb->input['lart']),
+                    'lreal' => htmlspecialchars_uni($mybb->input['lreal']),
+                    'lbesp' => (int)$mybb->input['lbesp'],
+                    'lstat' => (int)$mybb->input['lstat'],
+                    'lparent' => (int)$mybb->input['lparent'],
+                    'lverantw' => (int)$mybb->input['lverantw']
+                );
+                
+                if ($db->insert_query("laender", $insert_query))
+                {
+                    redirect("admin/index.php?module=config-fcverw&action=laender");
+                } 
+ 
+            }
+            else
+            {
+                // Wenn Ländername leer, dann Fehldermeldung generieren!
+                
+                if ((!$mybb->input['lname'] || $mybb->input['lname'] == '') && $mybb->request_method == 'post')
+                {
+                    $l_fehler = " <b><font color='#ff0000'>Der L&auml;ndername muss ausgef&uuml;llt sein!</font></b>";
+                }
+                // Wenn untergeordnete Region = 0 und Länderregion leer, dann Fehlermeldung generieren!
+                if (($mybb->input['lstat'] == '0' && $mybb->input['lrid'] == '0') && $mybb->request_method == 'post')
+                {
+                    $r_fehler = " <b><font color='#ff000'>Es muss eine Region zugeordnet werden!</font></b>";
+                }
+                
+                // Wenn Untergeordnete Region = 1 und Übergeordnetes Land = 0, dann Fehlermeldung
+                if (($mybb->input['lstat'] == '1' && $mybb->input['lparent'] == '0') && $mybb->request_method == 'post')
+                {
+                    $lu_fehler = " <b><font color='#ff000'>Es muss ein &uuml;bergeordnetes Land zugeordnet werden!</font></b>";
+                }
+
+                $page->add_breadcrumb_item('Land anlegen');
+                $page->output_header('L&auml;nderverwaltung - Land anlegen');
+
+                // which tab is selected? hier: add_region
+                $page->output_nav_tabs($sub_tabs, 'add_land');
+
+                // Neues Formular erstellen
+                $form = new Form("index.php?module=config-fcverw&amp;action=add_land", "post", "", 1);
+                $form_container = new FormContainer('Neues Land anlegen');
+
+                // der name
+                $form_container->output_row(
+                    'Name des Landes'.$l_fehler,
+                    'Vollst&auml;ndiger Name des Landes',
+                    $form->generate_text_box(
+                        'lname',
+                        htmlspecialchars_uni($mybb->input['lname']),
+                        array('style' => 'width: 200px;')
+                    )
+                );
+                
+                // Kürzel
+                $form_container->output_row(
+                    'K&uuml;rzel des Landes',
+                    'Wie wird das Land abgek&uuml;rzt? Z.B. Russland - RUS. Bitte alle Buchstaben groß schreiben.',
+                    $form->generate_text_box(
+                        'lkuerzel',
+                        $db->escape_string($mybb->input['lkuerzel'])
+                    )
+                );
+                
+                // Art des Landes
+                $form_container->output_row(
+                    'Art des Landes',
+                    'Handelt es sich z.B. um ein K&ouml;nigreich, ein Herzogtum oder eine Grafschaft?',
+                    $form->generate_text_box(
+                        'lart',
+                        $db->escape_string($mybb->input['lart'])
+                    )
+                );
+                
+                // Untergeordnet?
+                $lstats[0] = 'Nein, eigenst&auml;ndiges Land';
+                $lstats[1] = 'Ja, untergeordnetes Land';
+                $form_container->output_row(
+                    'Untergeordnete Region?',
+                    'Handelt es sich um einen Herrschaftsbereich, der einem anderen untergeordnet ist?',
+                    $form->generate_select_box(
+                        'lstat',
+                        $lstats,
+                        $mybb->input['lstat'],
+                        array('id' => 'lstat', 'style' => 'width: 200px;')
+                    ),
+                    'lstat'
+                );
+                
+                // die zugeordnete Region // Wenn Untergeordnet Nein
+                // Regionen auslesen
+                $regionen = array();
+                $regionen[0] = "<b>Bitte Region w&auml;hlen!</b>";
+                
+                // Länder auslesen
+                $lparent = array();
+                $lparent[0] = "kein &uuml;bergeordnetes Land";
+                
+                
+                // Funktion für das Auslesen der Kontinente und dazugehörigen Regionen
+                $reg = fcverw_KonReg();
+                while ($regdata = $db->fetch_array($reg))
+                {
+                    //Regionen definieren für Variante 1 (nicht untergeordnet)
+                    $regionen[$regdata['rid']] = "[".$regdata['kname']."] ".$regdata['rname'];
+                    
+                    // Angelegte Länder definieren für Variante 2 (untergeordnet)
+                    // Aufruf Funktion für die Darstellung des Landes
+                    $query = fcverw_LandList($regdata['rid']);
+                    while ($landdata = $db->fetch_array($query))
+                    {
+                        $trenner = str_repeat("-", $landdata['Ebene']);
+                        $lparent[$landdata['landid']] = "[".$regdata['kname']." - ".$regdata['rname']."] ".$trenner." ".$landdata['lname']." (".$landdata['lart'].")";
+                    }
+                }
+                $form_container->output_row(
+                    'Region'.$r_fehler,
+                    'Zu welcher geopolitischen Region geh&ouml;rt das Land? Im Falle, dass real mehrere zutreffen, bitte die der gr&ouml;&szlig;ten Landmasse angeben!',
+                    $form->generate_select_box(
+                        'lrid',
+                        $regionen,
+                        $mybb->input['lrid'], 
+                        array('style' => 'width: 200px;', 'id' => 'lrid')
+                    ),
+                    'lrid',
+                    array(),
+                    array('id' => 'row_lrid')
+                );
+ 
+                // Übergeordnetes Land // Wenn Untergeordnet Ja
+                $form_container->output_row(
+                    '&Uuml;bergeordnetes Land'.$lu_fehler,
+                    'Welches Land ist &uuml;bergeordnet?',
+                    $form->generate_select_box(
+                        'lparent',
+                        $lparent,
+                        $mybb->input['lparent'], 
+                        array('style' => 'width: 200px;', 'id' => 'lparent')
+                    ),
+                    'lparent',
+                    array(),
+                    array('id' => 'row_lparent')
+                );
+
+                
+                // Reales Gebiet
+                $form_container->output_row(
+                    'Reales Gebiet',
+                    'Welche realen Gebiete umfasst das fiktive Land?',
+                    $form->generate_text_box(
+                        'lreal',
+                        $db->escape_string($mybb->input['lreal'])
+                    )
+                );
+                
+                // Bespielt?
+                $form_container->output_row(
+                    'Ist das Land bereits bespielt?',
+                    'Gibt es bereits politisch relevante Charaktere?',
+                    $form->generate_yes_no_radio(
+                        'lbesp',
+                        '0',
+                        $db->escape_string($mybb->input['lbesp']),
+                        array('id' => 'lbesp')
+                    ),
+                    'lbesp'
+                );
+                
+                // Länderverantwortlicher
+                // User auslesen - warum gibt es keine Standardfunktion??
+                $ugroups = "'2', '3', '4', '6', '8', '9', '10'";
+                $userselect = fcverw_UserSelect($ugroups);
+                $lverantw[0] = "kein L&auml;nderverantwortlicher";
+                
+                while ($lverantwortlich = $db->fetch_array($userselect))
+                {
+                    $lverantw[$lverantwortlich['uid']] = $lverantwortlich['username'];
+                }
+                
+                $form_container->output_row(
+                    'L&auml;nderverantwortlichkeit',
+                    'Wer ist f&uuml;r das Land (insb. Verwaltung, Informationen) verantwortlich?',
+                    $form->generate_select_box(
+                        'lverantw',
+                        $lverantw,
+                        $mybb->input['lverantw'], 
+                        array('style' => 'width: 200px;', 'id' => 'lverantw')
+                    ),
+                    'lverantw', 
+                    array(), 
+                    array('id' => 'row_lverantw')
+                );
+
+
+                $form_container->end();
+                $button[] = $form->generate_submit_button('Land anlegen');
+                $form->output_submit_wrapper($button);
+                $form->end();
+                
+                echo '
+                    <script type="text/javascript" src="./jscripts/peeker.js?ver=1821"></script>
+                    <script type="text/javascript">
+                        $(function() {
+                            new Peeker($("#lstat"), $("#row_lrid"), /^0/, false);
+                            new Peeker($("#lstat"), $("#row_lparent"), /^1/, false);
+                        });
+                    </script>
+                ';
+            }   
+        } // Ende Land anlegen
 
 
 // c. Länder
-// c4. Land - Diplomatie verwalten
+// c3. Land editieren
 
 // c. Länder
-// c5. Land - Verwandtschaft verwalten
+// c4. Land löschen
+
 
 // c. Länder
-// c6. Land - Informationen vewalten
+// c5. Land - Diplomatie verwalten
 
 // c. Länder
-// c7. Land - Familien verwalten
+// c6. Land - Verwandtschaft verwalten
 
+// c. Länder
+// c7. Land - Informationen vewalten
+
+// c. Länder
+// c8. Land - Familien verwalten
 
 
         $page->output_footer();
