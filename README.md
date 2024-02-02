@@ -1,2 +1,4 @@
 # FC-Verwaltung
-Verwaltung für mein FC-Verwaltungs-Plugin
+ACHTUNG! ABSOLUTES TESTGEBIET!
+
+Verwaltung für Länder, Regionen und Kontinente + weitere Funktionen.
