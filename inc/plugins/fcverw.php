@@ -40,7 +40,28 @@ function fcverw_install()
             `lstat` int(1) NOT NULL DEFAULT 0,
             `lparent` int(15) NOT NULL,
             `lverantwortl` int(15) NOT NULL,
+            `ldelete` int(1) NOT NULL DEFAULT 0
             PRIMARY KEY (`landid`)
+        )
+        ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci AUTO_INCREMENT=1
+    ");
+
+    $db->write_query("
+        CREATE TABLE ".TABLE_PREFIX."laender_archive (
+            `lid` int(15) UNSIGNED NOT NULL AUTO_INCREMENT,
+            `landid` int(15) NOT NULL,
+            `lkid` int(15) NOT NULL,
+            `lrid` int(15) NOT NULL,
+            `lname` varchar(255) NOT NULL,
+            `lkuerzel` varchar(10) NOT NULL,
+            `lart` varchar(255) NOT NULL,
+            `lreal` text NOT NULL,
+            `lbesp` int(1) NOT NULL DEFAULT 0,
+            `lstat` int(1) NOT NULL DEFAULT 0,
+            `lparent` int(15) NOT NULL,
+            `lverantwortl` int(15) NOT NULL,
+            `ldelete` int(1) NOT NULL DEFAULT 1
+            PRIMARY KEY (`lid`)
         )
         ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci AUTO_INCREMENT=1
     ");
