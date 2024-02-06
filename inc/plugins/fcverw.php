@@ -219,125 +219,8 @@ function fcverw_deactivate()
                                           Let the magic begin
    **********************************************************************************************
    ********************************************************************************************** */
-
-
-/* ***********************************************
-          Part 00: Get Global
-   *********************************************** */
-
-function fcverw_KonReg()
-{
-    global $db, $mybb, $konreg;
-    
-    $konreg  = $db->write_query("
-        SELECT 
-            r.rid, r.rname, r.rkid, k.kname, k.kid
-        FROM 
-            ".TABLE_PREFIX."laender_regionen r 
-        LEFT JOIN 
-            ".TABLE_PREFIX."laender_kontinente k 
-        ON 
-            k.kid = r.rkid 
-        ORDER BY 
-            k.kname, r.rname
-    ");
-        
-    return $konreg;
-}
-
-
-function fcverw_LandList($rid)
-{
-    global $db, $mybb, $landliste;
-    
-    $landliste = $db->query("
-        WITH RECURSIVE 
-            LandListe
-            (
-                landid, 
-                lname, 
-                lkuerzel, 
-                lart, 
-                lreal, 
-                lbesp, 
-                lstat, 
-                lparent, 
-                lverantw, 
-                Ebene, 
-                Path
-            )
-        AS 
-        (
-            SELECT 
-                landid, 
-                lname, 
-                lkuerzel, 
-                lart, 
-                lreal, 
-                lbesp, 
-                lstat, 
-                lparent, 
-                lverantw, 
-                0 AS Ebene, 
-                CAST(lname AS CHAR(2000))
-            FROM 
-                ".TABLE_PREFIX."laender
-            WHERE 
-                lrid = '".$rid."'
-                    AND 
-                lparent IS NULL 
-            
-            UNION ALL 
-            
-            SELECT 
-                l.landid, 
-                l.lname, 
-                l.lkuerzel, 
-                l.lart, 
-                l.lreal, 
-                l.lbesp, 
-                l.lstat, 
-                l.lparent, 
-                l.lverantw, 
-                la.Ebene + 1, 
-                CONCAT(la.path, ',', l.lname)
-            FROM 
-                LandListe AS la 
-            JOIN 
-                ".TABLE_PREFIX."laender AS l
-            ON 
-                la.landid = l.lparent
-        )
-        SELECT 
-            * 
-        FROM 
-            LandListe 
-        ORDER BY 
-            Path;
-    ");
-    
-    return $landliste;
-}
-
-
-function fcverw_UserSelect($ugroups)
-{
-    global $db, $mybb, $userselect;
-    
-    $userselect  = $db->write_query("
-        SELECT 
-            * 
-        FROM 
-            ".TABLE_PREFIX."users
-        WHERE 
-            usergroup IN (".$ugroups.") 
-        ORDER BY 
-            username
-    ");
-        
-    return $userselect;
-    
-}
+// Load the Globals that are for everything
+require_once MYBB_ROOT.'inc/plugins/fcverw/fcverw_global.php';
 
 
 
@@ -404,7 +287,8 @@ function fcverw_admin()
         $sub_tabs['laender'] = array(
             'title'	=> 'Alle L&auml;nder',
             'link'	=> 'index.php?module=config-fcverw',
-            'description'   => '&Uuml;bersicht aller L&auml;nder<br />
+            'description'   => '&Uuml;bersicht aller L&auml;nder, aufgeteilt nach aktiven und archivierten Ländern. <br />
+            Wichtig: Wenn viele Länder wiederhergestellt wurden, dann zur Sicherheit <b><a href="index.php?module=config-fcverw&amp;action=ber_laender">Daten bereinigen</a></b>.<br /><br />
   			<img src="fcverw/frei.png"> Land frei; <img src="fcverw/vergeben.png"> Land vergeben; <img src="fcverw/error.png"> Land vergeben ohne Verantwortlichen'
         );
         $sub_tabs['add_land'] = array(
@@ -441,34 +325,38 @@ function fcverw_admin()
         {
             $page->add_breadcrumb_item('&Uuml;bersicht aller Kontinente');
             $page->output_header('L&auml;nderverwaltung - &Uuml;bersicht aller Kontinente');
-
+        
             // Welches Tab ist ausgewählt?
             $page->output_nav_tabs($sub_tabs, 'kontinente');
-
+            
+            // Tabelle alle aktiven Kontinente
             // Tabelle kreieren - Headerzeile
             $form = new Form("index.php?module=config-fcverw", "post");
-            $form_container = new FormContainer('Alle Kontinente');
-            $form_container->output_row_header('ID', array("class" => "align_center", "width" => "3%"));
+            $form_container = new FormContainer('Alle aktiven Kontinente');
+            $form_container->output_row_header('ID', array("class" => "align_center", "width" => "5%"));
             $form_container->output_row_header('Kontinentname', array("class" => "align_center", "width" => "15%"));
             $form_container->output_row_header('Beschreibung', array("class" => "align_center"));
-            $form_container->output_row_header('Regionen', array("class" => "align_center", "width" => "5%"));
-            $form_container->output_row_header('L&auml;nder', array("class" => "align_center", "width" => "5%"));
+            $form_container->output_row_header('Regionen<br /> aktiv (archiviert)', array("class" => "align_center", "width" => "8%"));
+            $form_container->output_row_header('L&auml;nder<br /> aktiv (archiviert)', array("class" => "align_center", "width" => "8%"));
             $form_container->output_row_header('Optionen', array("class" => "align_center", "width" => "15%"));
-
-            // Hier werden die Kontinente ausgelesen
-            $fc_kontsel = $db->write_query("SELECT * FROM ".TABLE_PREFIX."laender_kontinente ORDER BY kname");
+        
+            // Hier werden die aktiven Kontinente ausgelesen
+            $fc_kontsel = $db->simple_select("laender_kontinente", "*", "kdelete = '0'", array('order_by' => 'kname'));
             while ($row = $db->fetch_array($fc_kontsel))
             {
                 // Auslesen der Anzahl der Regionen und Länder
-                $regionen = $db->num_rows($db->simple_select("laender_regionen", "rid", "rkid = ".$row['kid']));
-                $laender = $db->num_rows($db->simple_select("laender", "landid", "lkid = ".$row['kid']));
-
+                $regionena = $db->num_rows($db->simple_select("laender_regionen", "rid", "rdelete = '0' AND rkid = ".$row['kid']));
+                $regionenb = $db->num_rows($db->simple_select("laender_regionen", "rid", "rdelete = '1' AND rkid = ".$row['kid']));
+                $laendera = $db->num_rows($db->simple_select("laender", "landid", "ldelete = '0' AND lkid = ".$row['kid']));
+                $laenderb = $db->num_rows($db->simple_select("laender_archive", "landid", "ldelete = '1' AND lkid = ".$row['kid']));
+                
+        
                 $form_container->output_cell($row['kid'], array("class" => "align_center"));
                 $form_container->output_cell("<b>".$row['kname']."</b>");
                 $form_container->output_cell($row['kbeschr']);
-                $form_container->output_cell($regionen, array("class" => "align_center"));
-                $form_container->output_cell($laender, array("class" => "align_center"));
-
+                $form_container->output_cell($regionena." (".$regionenb.")", array("class" => "align_center"));
+                $form_container->output_cell($laendera." (".$laenderb.")", array("class" => "align_center"));
+        
                 // Optionen-Fach basteln
                 //erst pop up dafür bauen - danke an @Risuena
                 $popup = new PopupMenu("fcverw_".$row['kid'], "Optionen");
@@ -477,16 +365,61 @@ function fcverw_admin()
                     "index.php?module=config-fcverw&amp;action=edit_kontinent&amp;kid=".$row['kid']
                 );
                 $popup->add_item(
-                    "L&ouml;schen",
+                    "Archivieren",
                     "index.php?module=config-fcverw&amp;action=del_kontinent&amp;kid=".$row['kid']
                 );
                 $form_container->output_cell($popup->fetch(), array("class" => "align_center"));
-
+        
                 $form_container->construct_row(); // Reihe erstellen
             }
-
             $form_container->end();
+            
+            // Tabelle alle aktiven Kontinente
+            // Tabelle kreieren - Headerzeile
+            $form = new Form("index.php?module=config-fcverw", "post");
+            $form_container = new FormContainer('Alle archivierten Kontinente');
+            $form_container->output_row_header('ehem. ID', array("class" => "align_center", "width" => "5%"));
+            $form_container->output_row_header('Kontinentname', array("class" => "align_center", "width" => "15%"));
+            $form_container->output_row_header('Beschreibung', array("class" => "align_center"));
+            $form_container->output_row_header('Regionen<br /> aktiv (archiviert)', array("class" => "align_center", "width" => "8%"));
+            $form_container->output_row_header('L&auml;nder<br /> aktiv (archiviert)', array("class" => "align_center", "width" => "8%"));
+            $form_container->output_row_header('Optionen', array("class" => "align_center", "width" => "15%"));
+        
+            // Hier werden die gelöschten Kontinente ausgelesen
+            $fc_kontsel2 = $db->simple_select("laender_kontinente", "*", "kdelete = '1'", array('order_by' => 'kname'));
+            while ($row2 = $db->fetch_array($fc_kontsel2))
+            {
+                // Auslesen der Anzahl der Regionen und Länder
+                $regionena2 = $db->num_rows($db->simple_select("laender_regionen", "rid", "rdelete = '0' AND rkid = ".$row2['kid'])); // aktive regionen
+                $regionenb2 = $db->num_rows($db->simple_select("laender_regionen", "rid", "rdelete = '1' AND rkid = ".$row2['kid'])); // gelöschte regionen
+                $laendera2 = $db->num_rows($db->simple_select("laender", "landid", "ldelete = '0' AND lkid = ".$row2['kid'])); // aktive regionen
+                $laenderb2 = $db->num_rows($db->simple_select("laender_archive", "landid", "ldelete = '1' AND lkid = ".$row2['kid'])); // gelöschte regionen
+        
+                $form_container->output_cell($row2['kid'], array("class" => "align_center"));
+                $form_container->output_cell("<b>".$row2['kname']."</b>");
+                $form_container->output_cell($row2['kbeschr']);
+                $form_container->output_cell($regionena2." (".$regionenb2.")", array("class" => "align_center"));
+                $form_container->output_cell($laendera2." (".$laenderb2.")", array("class" => "align_center"));
+        
+                // Optionen-Fach basteln
+                //erst pop up dafür bauen - danke an @Risuena
+                $popup2 = new PopupMenu("fcverw_".$row2['kid'], "Optionen");
+                $popup2->add_item(
+                    "Editieren",
+                    "index.php?module=config-fcverw&amp;action=edit_kontinent&amp;kid=".$row2['kid']
+                );
+                $popup2->add_item(
+                    "Wiederherstellen",
+                    "index.php?module=config-fcverw&amp;action=re_kontinent&amp;kid=".$row2['kid']
+                );
+                $form_container->output_cell($popup2->fetch(), array("class" => "align_center"));
+        
+                $form_container->construct_row(); // Reihe erstellen
+            }
+            $form_container->end();
+            
             $form->end();
+            
         } // Ende der Kontinentübersicht
 
 
@@ -565,9 +498,50 @@ function fcverw_admin()
             // Eintrag machen
             if ($mybb->request_method == 'post' && $mybb->input['kname'] != '')
             {
+                if ($mybb->input['kdelete'] == '1')
+                {
+                    // Länder kopieren und löschen
+                    $landselect = $db->simple_select("laender", "*", "lkid = ".$mybb->input['kid'], array("order_by" => 'landid'));
+                    while ($landdata = $db->fetch_array($landselect))
+                    {
+                        $insert = array(
+                            "landid" => $landdata['landid'],
+                            "lkid" => $landdata['lkid'],
+                            "lrid" => $landdata['lrid'],
+                            "lname" => $landdata['lname'],
+                            "lkuerzel" => $landdata['lkuerzel'],
+                            "lart" => $landdata['lart'],
+                            "lreal" => $landdata['lreal'],
+                            "lbesp" => $landdata['lbesp'],
+                            "lstat" => $landdata['lstat'],
+                            "lparent" => $landdata['lparent'],
+                            "lverantw" => $landdata['lverantw']
+                        );
+                        
+                        // Prüfen, ob das Land mit der LandID bereits vorhanden ist
+                        $probe = $db->simple_select("laender_archive", "*", "landid = ".$landdata['landid']);
+                        // Wenn Ergebnis = 0, dann eintragen - ansonsten nicht.
+                        if ($db->num_rows($probe) == '0')
+                        {
+                            $db->insert_query("laender_archive", $insert);
+                        }
+                        
+                        // Hier in jedem Fall alle löschen.
+                        $db->delete_query("laender", "landid = ".$landdata['landid']);
+                    }
+                    
+        
+                    // Regionen updaten
+                    $update_regionen = array(
+                        'rdelete' => "1"
+                    );
+                    $db->update_query("laender_regionen", $update_regionen, "rkid = ".(int)$mybb->input['kid']);
+                }
+                
                 $update_query = array(
                     'kname' => htmlspecialchars_uni($mybb->input['kname']),
-                    'kbeschr' => htmlspecialchars_uni($mybb->input['kbeschr'])
+                    'kbeschr' => htmlspecialchars_uni($mybb->input['kbeschr']),
+                    'kdelete' => (int)$mybb->input['kdelete']
                 );
 
                 if ($db->update_query("laender_kontinente", $update_query, "kid = ".(int)$mybb->input['kid']))
@@ -631,6 +605,52 @@ function fcverw_admin()
                         $db->escape_string($data['kbeschr'])
                     )
                 );
+                
+                
+                if ($data['kdelete'] == '1')
+                {
+                    $kdelete[0] = "Wiederherstellen";
+                    $kdelete[1] = "Archivierung beibehalten";
+                    
+                    if ($mybb->input['kdelete'] == '')
+                    {
+                        $mybb->input['kdelete'] = $data['kdelete'];
+                    }
+                    
+                    // Gelöschtes Land wiederherstellen?
+                    $form_container->output_row(
+                        'Wiederherstellen',
+                        'Soll der archivierte Kontinent wiederhergestellt werden?',
+                        $form->generate_select_box(
+                            'kdelete',
+                            $kdelete,
+                            $mybb->input['kdelete'], 
+                            array('style' => 'width: 200px;')
+                        )
+                    ); 
+                }
+                else 
+                {
+                    $kdelete[0] = "Nein";
+                    $kdelete[1] = "Ja";
+                    
+                    if ($mybb->input['kdelete'] == '')
+                    {
+                        $mybb->input['kdelete'] = $data['kdelete'];
+                    }
+                    
+                    // Gelöschtes Land wiederherstellen?
+                    $form_container->output_row(
+                        'Archivieren?',
+                        'Soll der Kontinent archiviert werden?',
+                        $form->generate_select_box(
+                            'kdelete',
+                            $kdelete,
+                            $mybb->input['kdelete'], 
+                            array('style' => 'width: 200px;')
+                        )
+                    ); 
+                }
 
                 $form_container->end();
                 $button[] = $form->generate_submit_button('Kontinent editieren');
@@ -648,19 +668,69 @@ function fcverw_admin()
             $kid = (int)$mybb->input['kid'];
 
             // Länder updaten
-            $update_laender = array(
-                'lkid' => "0"
-            );
-            $db->update_query("laender", $update_laender, "lkid = ".$kid);
+            // Länder kopieren und löschen
+            $landselect = $db->simple_select("laender", "*", "lkid = ".$mybb->input['kid'], array("order_by" => 'landid'));
+            while ($landdata = $db->fetch_array($landselect))
+            {
+                $insert = array(
+                    "landid" => $landdata['landid'],
+                    "lkid" => $landdata['lkid'],
+                    "lrid" => $landdata['lrid'],
+                    "lname" => $landdata['lname'],
+                    "lkuerzel" => $landdata['lkuerzel'],
+                    "lart" => $landdata['lart'],
+                    "lreal" => $landdata['lreal'],
+                    "lbesp" => $landdata['lbesp'],
+                    "lstat" => $landdata['lstat'],
+                    "lparent" => $landdata['lparent'],
+                    "lverantw" => $landdata['lverantw']
+                );
+                            
+                // Prüfen, ob das Land mit der LandID bereits vorhanden ist
+                $probe = $db->simple_select("laender_archive", "*", "landid = ".$landdata['landid']);
+                // Wenn Ergebnis = 0, dann eintragen - ansonsten nicht.
+                if ($db->num_rows($probe) == '0')
+                {
+                    $db->insert_query("laender_archive", $insert);
+                }
+                            
+                // Hier in jedem Fall alle löschen.
+                $db->delete_query("laender", "landid = ".$landdata['landid']);
+            }
 
             // Regionen updaten
             $update_regionen = array(
-                'rkid' => "0"
+                'rdelete' => "1"
             );
             $db->update_query("laender_regionen", $update_regionen, "rkid = ".$kid);
 
-            // Eintrag löschen
-            if ($db->delete_query("laender_kontinente", "kid = ".$kid))
+
+            // Eintrag abändern - Delete = 1
+            $update = array(
+                'kdelete' => '1'
+            );
+            
+            if ($db->update_query("laender_kontinente", $update, "kid = ".$kid))
+            {
+                redirect("admin/index.php?module=config-fcverw&action=kontinente");
+            }
+
+        } // Ende Löschen Kontinent
+
+
+
+// a. Kontinente
+// a5. Kontinent wiederherstellen
+        if ($mybb->input['action'] == "re_kontinent")
+        {
+            $kid = (int)$mybb->input['kid'];
+
+            // Eintrag abändern - Delete = 0
+            $update = array(
+                'kdelete' => '0'
+            );
+            
+            if ($db->update_query("laender_kontinente", $update, "kid = ".$kid))
             {
                 redirect("admin/index.php?module=config-fcverw&action=kontinente");
             }
@@ -676,33 +746,32 @@ function fcverw_admin()
         if ($mybb->input['action'] == "regionen")
         {
             $page->add_breadcrumb_item('&Uuml;bersicht aller Regionen');
-            $page->output_header('L&auml;nderverwaltung - &Uuml;bersicht aller regionen');
+            $page->output_header('L&auml;nderverwaltung - &Uuml;bersicht aller Regionen');
 
             // Welches Tab ist ausgewählt?
             $page->output_nav_tabs($sub_tabs, 'regionen');
 
             // Tabelle kreieren - Headerzeile
             $form = new Form("index.php?module=config-fcverw", "post");
-            $form_container = new FormContainer('Alle Regionen');
-            $form_container->output_row_header('ID', array("class" => "align_center", "width" => "3%"));
+            $form_container = new FormContainer('Alle aktiven Regionen (in aktiven Kontinenten)');
+            $form_container->output_row_header('ID', array("class" => "align_center", "width" => "5%"));
             $form_container->output_row_header('Regionenname', array("class" => "align_center", "width" => "25%"));
             $form_container->output_row_header('Beschreibung', array("class" => "align_center"));
-            $form_container->output_row_header('L&auml;nder', array("class" => "align_center", "width" => "5%"));
+            $form_container->output_row_header('L&auml;nder<br>aktiv (archiviert)', array("class" => "align_center", "width" => "10%"));
             $form_container->output_row_header('Optionen', array("class" => "align_center", "width" => "15%"));
 
-            // Hier werden die Regionen ausgelesen
-            $fc_regsel = fcverw_KonReg();
-                
-                
+            // Hier werden die aktiven Regionen ausgelesen
+            $fc_regsel = fcverw_KonReg(0, 0);
             while ($row = $db->fetch_array($fc_regsel))
             {
-                // Auslesen der Anzahl der Regionen und Länder
-                $laender = $db->num_rows($db->simple_select("laender", "landid", "lrid = ".$row['rid']));
+                // Auslesen der Anzahl der Länder
+                $laendera = $db->num_rows($db->simple_select("laender", "landid", "ldelete = '0' AND lrid = ".$row['rid']));
+                $laenderb = $db->num_rows($db->simple_select("laender_archive", "landid", "ldelete = '1' AND lrid = ".$row['rid']));
 
                 $form_container->output_cell($row['rid'], array("class" => "align_center"));
                 $form_container->output_cell("[".$row['kname']."] <b>".$row['rname']."</b>");
                 $form_container->output_cell($row['rbeschr']);
-                $form_container->output_cell($laender, array("class" => "align_center"));
+                $form_container->output_cell($laendera." (".$laenderb.")", array("class" => "align_center"));
 
                 // Optionen-Fach basteln
                 //erst pop up dafür bauen - danke an @Risuena
@@ -712,15 +781,84 @@ function fcverw_admin()
                     "index.php?module=config-fcverw&amp;action=edit_region&amp;rid=".$row['rid']
                 );
                 $popup->add_item(
-                    "L&ouml;schen",
+                    "Archivieren",
                     "index.php?module=config-fcverw&amp;action=del_region&amp;rid=".$row['rid']
                 );
                 $form_container->output_cell($popup->fetch(), array("class" => "align_center"));
 
                 $form_container->construct_row(); // Reihe erstellen
             }
-
             $form_container->end();
+            
+            
+            $form_container = new FormContainer('Alle archivierten Regionen (in aktiven Kontinenten)');
+            $form_container->output_row_header('ehem. ID', array("class" => "align_center", "width" => "5%"));
+            $form_container->output_row_header('Regionenname', array("class" => "align_center", "width" => "25%"));
+            $form_container->output_row_header('Beschreibung', array("class" => "align_center"));
+            $form_container->output_row_header('L&auml;nder<br>aktiv (archiviert)', array("class" => "align_center", "width" => "10%"));
+            $form_container->output_row_header('Optionen', array("class" => "align_center", "width" => "15%"));
+
+            // Hier werden die aktiven Regionen ausgelesen
+            $fc_regsel2 = fcverw_KonReg(0, 1);
+            while ($row2 = $db->fetch_array($fc_regsel2))
+            {
+                // Auslesen der Anzahl der Regionen und Länder
+                $laendera2 = $db->num_rows($db->simple_select("laender", "landid", "lrid = ".$row2['rid']));
+                $laenderb2 = $db->num_rows($db->simple_select("laender_archive", "landid", "lrid = ".$row2['rid']));
+
+                $form_container->output_cell($row2['rid'], array("class" => "align_center"));
+                $form_container->output_cell("[".$row2['kname']."] <b>".$row2['rname']."</b>");
+                $form_container->output_cell($row2['rbeschr']);
+                $form_container->output_cell($laendera2." (".$laenderb2.")", array("class" => "align_center"));
+
+                // Optionen-Fach basteln
+                //erst pop up dafür bauen - danke an @Risuena
+                $popup2 = new PopupMenu("fcverw_".$row2['rid'], "Optionen");
+                $popup2->add_item(
+                    "Editieren",
+                    "index.php?module=config-fcverw&amp;action=edit_region&amp;rid=".$row2['rid']
+                );
+                $popup2->add_item(
+                    "Wiederherstellen",
+                    "index.php?module=config-fcverw&amp;action=re_region&amp;rid=".$row2['rid']
+                );
+                $form_container->output_cell($popup2->fetch(), array("class" => "align_center"));
+
+                $form_container->construct_row(); // Reihe erstellen
+            }
+            $form_container->end();
+            
+            
+            $form_container = new FormContainer('Alle Regionen (in archivierten Kontinenten)');
+            $form_container->output_row_header('ehem. ID', array("class" => "align_center", "width" => "5%"));
+            $form_container->output_row_header('Regionenname', array("class" => "align_center", "width" => "25%"));
+            $form_container->output_row_header('Beschreibung', array("class" => "align_center"));
+            $form_container->output_row_header('L&auml;nder<br>aktiv (archiviert)', array("class" => "align_center", "width" => "10%"));
+            $form_container->output_row_header('Optionen', array("class" => "align_center", "width" => "15%"));
+
+
+            // Hier werden die Regionen in gelöschten Kontinenten ausgelesen
+            $fc_regsel3 = fcverw_KonReg(1, 2);
+            while ($row3 = $db->fetch_array($fc_regsel3))
+            {
+                // Auslesen der Anzahl der Regionen und Länder
+                $laendera3 = $db->num_rows($db->simple_select("laender", "landid", "lrid = ".$row3['rid']));
+                $laenderb3 = $db->num_rows($db->simple_select("laender_archive", "landid", "lrid = ".$row3['rid']));
+
+                $form_container->output_cell($row3['rid'], array("class" => "align_center"));
+                $form_container->output_cell("[".$row3['kname']."] <b>".$row3['rname']."</b>");
+                $form_container->output_cell($row3['rbeschr']);
+                $form_container->output_cell($laendera3." (".$laenderb3.")", array("class" => "align_center"));
+
+                // Optionen-Fach basteln
+                $form_container->output_cell("Bitte erst den Kontinent aktivieren!", array("class" => "align_center"));
+
+                $form_container->construct_row(); // Reihe erstellen
+            }
+            $form_container->end();
+            
+            
+            
             $form->end();
         } // Ende der Regionenübersicht
 
@@ -825,10 +963,47 @@ function fcverw_admin()
             // Eintrag machen
             if ($mybb->request_method == 'post' && $mybb->input['rname'] != '')
             {
+                // Länder updaten
+                if ($mybb->input['rdelete'] == '1')
+                {
+                    // Länder updaten
+                    // Länder kopieren und löschen
+                    $landselect = $db->simple_select("laender", "*", "lrid = ".$mybb->input['rid'], array("order_by" => 'landid'));
+                    while ($landdata = $db->fetch_array($landselect))
+                    {
+                        $insert = array(
+                            "landid" => $landdata['landid'],
+                            "lkid" => $landdata['lkid'],
+                            "lrid" => $landdata['lrid'],
+                            "lname" => $landdata['lname'],
+                            "lkuerzel" => $landdata['lkuerzel'],
+                            "lart" => $landdata['lart'],
+                            "lreal" => $landdata['lreal'],
+                            "lbesp" => $landdata['lbesp'],
+                            "lstat" => $landdata['lstat'],
+                            "lparent" => $landdata['lparent'],
+                            "lverantw" => $landdata['lverantw']
+                        );
+                                    
+                        // Prüfen, ob das Land mit der LandID bereits vorhanden ist
+                        $probe = $db->simple_select("laender_archive", "*", "landid = ".$landdata['landid']);
+                        // Wenn Ergebnis = 0, dann eintragen - ansonsten nicht.
+                        if ($db->num_rows($probe) == '0')
+                        {
+                            $db->insert_query("laender_archive", $insert);
+                        }
+                                    
+                        // Hier in jedem Fall alle löschen.
+                        $db->delete_query("laender", "landid = ".$landdata['landid']);
+                    }
+        
+                }
+                
                 $update_query = array(
                     'rkid' => (int)$mybb->input['rkid'],
                     'rname' => htmlspecialchars_uni($mybb->input['rname']),
-                    'rbeschr' => htmlspecialchars_uni($mybb->input['rbeschr'])
+                    'rbeschr' => htmlspecialchars_uni($mybb->input['rbeschr']),
+                    'rdelete' => (int)$mybb->input['rdelete']
                 );
 
                 if ($db->update_query("laender_regionen", $update_query, "rid = ".(int)$mybb->input['rid']))
@@ -925,6 +1100,52 @@ function fcverw_admin()
                         $db->escape_string($data['rbeschr'])
                     )
                 );
+                
+                if ($data['rdelete'] == '1')
+                {
+                    $rdelete[0] = "Wiederherstellen";
+                    $rdelete[1] = "Archivierung beibehalten";
+                    
+                    if ($mybb->input['rdelete'] == '')
+                    {
+                        $mybb->input['rdelete'] = $data['rdelete'];
+                    }
+                    
+                    // Gelöschtes Region wiederherstellen?
+                    $form_container->output_row(
+                        'Wiederherstellen',
+                        'Soll die archivierte Region wiederhergestellt werden?',
+                        $form->generate_select_box(
+                            'rdelete',
+                            $rdelete,
+                            $mybb->input['rdelete'], 
+                            array('style' => 'width: 200px;')
+                        )
+                    ); 
+                }
+                else 
+                {
+                    $rdelete[0] = "Nein";
+                    $rdelete[1] = "Ja";
+                    
+                    if ($mybb->input['rdelete'] == '')
+                    {
+                        $mybb->input['rdelete'] = $data['rdelete'];
+                    }
+                    
+                    // Gelöschtes Region wiederherstellen?
+                    $form_container->output_row(
+                        'Archivieren?',
+                        'Soll die Region archiviert werden?',
+                        $form->generate_select_box(
+                            'rdelete',
+                            $rdelete,
+                            $mybb->input['rdelete'], 
+                            array('style' => 'width: 200px;')
+                        )
+                    ); 
+                }
+                
 
                 $form_container->end();
                 $button[] = $form->generate_submit_button('Region editieren');
@@ -941,18 +1162,71 @@ function fcverw_admin()
             $rid = (int)$mybb->input['rid'];
 
             // Länder updaten
-            $update_laender = array(
-                'lrid' => "0"
-            );
-            $db->update_query("laender", $update_laender, "lrid = ".$rid);
+            // Länder kopieren und löschen
+            $landselect = $db->simple_select("laender", "*", "lrid = ".$mybb->input['rid'], array("order_by" => 'landid'));
+            while ($landdata = $db->fetch_array($landselect))
+            {
+                $insert = array(
+                    "landid" => $landdata['landid'],
+                    "lkid" => $landdata['lkid'],
+                    "lrid" => $landdata['lrid'],
+                    "lname" => $landdata['lname'],
+                    "lkuerzel" => $landdata['lkuerzel'],
+                    "lart" => $landdata['lart'],
+                    "lreal" => $landdata['lreal'],
+                    "lbesp" => $landdata['lbesp'],
+                    "lstat" => $landdata['lstat'],
+                    "lparent" => $landdata['lparent'],
+                    "lverantw" => $landdata['lverantw']
+                );
+                            
+                // Prüfen, ob das Land mit der LandID bereits vorhanden ist
+                $probe = $db->simple_select("laender_archive", "*", "landid = ".$landdata['landid']);
+                // Wenn Ergebnis = 0, dann eintragen - ansonsten nicht.
+                if ($db->num_rows($probe) == '0')
+                {
+                    $db->insert_query("laender_archive", $insert);
+                }
+                            
+                // Hier in jedem Fall alle löschen.
+                $db->delete_query("laender", "landid = ".$landdata['landid']);
+            }
 
-            // Eintrag löschen
-            if ($db->delete_query("laender_regionen", "rid = ".$rid))
+            // Eintrag abändern - Delete = 1
+            $update = array(
+                'rdelete' => '1'
+            );
+            
+            if ($db->update_query("laender_regionen", $update, "rid = ".$rid))
             {
                 redirect("admin/index.php?module=config-fcverw&action=regionen");
             }
+            
+        } // Ende Löschen Region
+
+
+// b. Regionen
+// b5. Region wiederhierstellen
+        if ($mybb->input['action'] == "re_region")
+        {
+            $rid = (int)$mybb->input['rid'];
+
+            // Eintrag abändern - Delete = 0
+            $update = array(
+                'rdelete' => '0'
+            );
+
+            // Eintrag wiederherstellen
+            if ($db->update_query("laender_regionen", $update, "rid = ".$rid)) 
+            {
+                redirect("admin/index.php?module=config-fcverw&action=regionen");
+            }
+            
+           
 
         } // Ende Löschen Region
+
+
 
 
 
@@ -969,23 +1243,25 @@ function fcverw_admin()
 
             // Grundgerüst
             $form = new Form("index.php?module=config-fcverw", "post");
-            $form_container = new FormContainer('Alle L&auml;nder');
-            
-            $form_container->output_row_header('ID', array("class" => "align_center", "width" => "2%"));
-            $form_container->output_row_header('Landname', array("class" => "align_center", "colspan" => "2"));
-            $form_container->output_row_header('Landart', array("class" => "align_center", "width" => "15%"));
-            $form_container->output_row_header('L&auml;nderinfos', array("class" => "align_center", "width" => "15%"));
-            $form_container->output_row_header('Diplomatie', array("class" => "align_center", "width" => "15%"));
-            $form_container->output_row_header('Verwandtschaften', array("class" => "align_center", "width" => "15%"));
-            $form_container->output_row_header('Bewohner', array("class" => "align_center", "width" => "15%"));
             
             // Zunächst Kontinente und Regionen auslesen - um dann die jeweiligen Länder und Unterländer zu bekommen.
-            $select_query = fcverw_KonReg();
+            // Aktive Kontinente und Regionen
+            $select_query = fcverw_KonReg(0, 0);
+            
+            // Aktive Länder
+            $form_container = new FormContainer('Alle aktiven L&auml;nder (aktive Region, aktiver Kontinent)');
+            $form_container->output_row_header('ID', array("class" => "align_center", "width" => "5%"));
+            $form_container->output_row_header('Landname', array("class" => "align_center", "colspan" => "2"));
+            $form_container->output_row_header('Allgemeines', array("class" => "align_center", "width" => "13%"));
+            $form_container->output_row_header('L&auml;nderinfos', array("class" => "align_center", "width" => "13%"));
+            $form_container->output_row_header('Diplomatie', array("class" => "align_center", "width" => "13%"));
+            $form_container->output_row_header('Verwandtschaften', array("class" => "align_center", "width" => "13%"));
+            $form_container->output_row_header('Bewohner', array("class" => "align_center", "width" => "13%"));
             
             while ($data = $db->fetch_array($select_query))
             {
                 // Prüfen, ob überhaupt Ausgabe erforderlich
-                $lands = $db->simple_select("laender", "*", "lrid = ".$data['rid']." AND lstat = '0'", array('order_by' => 'lname'));
+                $lands = $db->simple_select("laender", "*", "lrid = ".$data['rid']." AND lstat = '0'");
                 
                 if ($db->num_rows($lands) > '0')
                 {
@@ -993,11 +1269,14 @@ function fcverw_admin()
                     $form_container->construct_row(); // Reihe erstellen
                     
                     // Funktion der Länderauflistung aufrufen und nutzen
-                    $query = fcverw_LandList($data['rid']);
+                    $query = fcverw_LandList($data['rid'], 0);
                     
                     while ($landdata = $db->fetch_array($query))
                     {
                         $trenner = str_repeat("-", $landdata['Ebene']);
+                        
+                        $image = "";
+                        $hinweis = "";
                         
                         // Prüfen, ob Land bespielt
                         if ($landdata['lbesp'] == '1')
@@ -1005,25 +1284,52 @@ function fcverw_admin()
                             // Prüfen, ob Spieler noch da
                             $use = $db->simple_select("users", "username", "uid = ".$landdata['lverantw']);
                             $count = $db->num_rows($use);
-                                
+                            $userl = $db->fetch_field($use, "username");
+                            
+                            $userlink = build_profile_link($userl, $landdata['lverantw']);
+                            
+                            
                             if ($count == '1')
                             {
-                                $image = '<img src="fcverw/vergeben.png" />';
+                                $image = '<a href="index.php?module=config-fcverw&action=free_land&landid='.$landdata['landid'].'"><img src="fcverw/vergeben.png" /></a>';
+                                $hinweis = "<br /><i>L&auml;nderverantwortung:</i> ".$userlink;
                             } 
                             else
                             {
-                                $image = '<img src="fcverw/error.png" />';
+                                $image = '<a href="index.php?module=config-fcverw&action=edit_land&landid='.$landdata['landid'].'"><img src="fcverw/error.png" /></a>';
                             } 
                         }
                         else 
                         {
-                            $image = '<img src="fcverw/frei.png" />';
+                            $image = '<a href="index.php?module=config-fcverw&action=take_land&landid='.$landdata['landid'].'"><img src="fcverw/frei.png" /></a>';
+                        }
+                        
+                        
+                        
+                        if ($landdata['ldelete'] == '1')
+                        {
+                            $landdata['lname'] = "<span style=\"opacity: .5;\">".$landdata['lname']."</span>";
+                            $hinweis = "(archiviert; hier nur für &Uuml;bersicht)";
+                            $image = "-";
                         }
                         
                         $form_container->output_cell($landdata['landid'], array("class" => "align_center"));
                         $form_container->output_cell($image, array("width" => "1%"));
-                        $form_container->output_cell($trenner." ".$landdata['lname']." (".$landdata['lart'].")");
-                        $form_container->output_cell('ID');
+                        $form_container->output_cell($trenner." ".$landdata['lname']." (".$landdata['lart'].") ".$hinweis);
+                        
+                        // Optionen-Fach basteln
+                        //erst pop up dafür bauen - danke an @Risuena
+                        $popup = new PopupMenu("fcverw_".$landdata['landid'], "Optionen");
+                        $popup->add_item(
+                            "Editieren",
+                            "index.php?module=config-fcverw&amp;action=edit_land&amp;landid=".$landdata['landid']
+                        );
+                        $popup->add_item(
+                            "Archivieren",
+                            "index.php?module=config-fcverw&amp;action=del_land&amp;landid=".$landdata['landid']."&amp;path=".$landdata['PathID']
+                        );
+                        $form_container->output_cell($popup->fetch(), array("class" => "align_center"));
+        
                         $form_container->output_cell('ID');
                         $form_container->output_cell('ID');
                         $form_container->output_cell('ID');
@@ -1034,6 +1340,81 @@ function fcverw_admin()
                 }
             } 
             $form_container->end();
+            
+            
+            
+            
+            // Nächstes: Archiviertes Land, Aktive Region, Aktiver Kontinent
+            $form_container = new FormContainer('Alle archivierten L&auml;nder (aktive Region, aktiver Kontinent)');
+            
+            $form_container->output_row_header('ehem. ID', array("class" => "align_center", "width" => "5%"));
+            $form_container->output_row_header('Landname', array("class" => "align_center"));
+            $form_container->output_row_header('Allgemeines', array("class" => "align_center", "width" => "13%"));
+            $form_container->output_row_header('L&auml;nderinfos', array("class" => "align_center", "width" => "13%"));
+            $form_container->output_row_header('Diplomatie', array("class" => "align_center", "width" => "13%"));
+            $form_container->output_row_header('Verwandtschaften', array("class" => "align_center", "width" => "13%"));
+            $form_container->output_row_header('Bewohner', array("class" => "align_center", "width" => "13%"));
+            
+            $select_query2 = fcverw_KonReg(0, 0);
+            
+            while ($data2 = $db->fetch_array($select_query2))
+            {
+                // Prüfen, ob überhaupt Ausgabe erforderlich
+                $landcount = $db->num_rows($db->simple_select("laender_archive", "*", "lrid = ".$data2['rid']));
+                
+                if ($landcount > '0')
+                {
+                    $form_container->output_cell($data2['kname'].' &raquo; <b>'.$data2['rname'].'</b>', array("colspan" => "8"));
+                    $form_container->construct_row(); // Reihe erstellen
+
+                    
+                    // Funktion der Länderauflistung aufrufen und nutzen
+                    $query2 = fcverw_LandList($data2['rid'], 1);
+
+                    while ($landdata2 = $db->fetch_array($query2))
+                    {
+                        $trenner2 = str_repeat("-", $landdata2['Ebene']);
+                        
+                        $hinweis = "";
+                        if ($landdata2['ldelete'] == '0')
+                        {
+                            $landdata2['lname'] = "<span style=\"opacity: .5;\">".$landdata2['lname']."</span>";
+                            $hinweis = "(aktiv; hier nur für &Uuml;bersicht)";
+                        }
+                        
+                        $form_container->output_cell($landdata2['landid'], array("class" => "align_center"));
+                        $form_container->output_cell($trenner2." ".$landdata2['lname']." (".$landdata2['lart'].") ".$hinweis);
+                        
+                        // Optionen-Fach basteln
+                        //erst pop up dafür bauen - danke an @Risuena
+                        $popup2 = new PopupMenu("fcverw2_".$landdata2['landid'], "Optionen");
+                        $popup2->add_item(
+                            "Editieren",
+                            "index.php?module=config-fcverw&amp;action=edit_land&amp;landid=".$landdata2['landid']
+                        );
+                        $popup2->add_item(
+                            "Wiederherstellen",
+                            "index.php?module=config-fcverw&amp;action=re_land&amp;landid=".$landdata2['landid']."&amp;path=".$landdata2['PathID']
+                        );
+                        $form_container->output_cell($popup2->fetch(), array("class" => "align_center"));
+        
+                        $form_container->output_cell('ID');
+                        $form_container->output_cell('ID');
+                        $form_container->output_cell('ID');
+                        $form_container->output_cell('ID');
+                        $form_container->construct_row(); // Reihe erstellen
+                    }       
+                } 
+            } 
+            $form_container->end();
+            
+            
+            
+            // Nächstes: Land, Inaktive Region, Kontinent
+            $form_container = new FormContainer('Alle aktiven L&auml;nder (archivierte Region, aktiver Kontinent)');
+            
+            
+            
             $form->end();
         } // Ende der Startseite
 
@@ -1044,8 +1425,11 @@ function fcverw_admin()
 
         if ($mybb->input['action'] == "add_land")
         {
-            // Wenn alle Pflichtangaben abgeschickt wurden, dann eintragen
-            if ($mybb->request_method == 'post' && $mybb->input['lname'] != '' && $mybb->input['lrid']!= '0' && ($mybb->input['lstat'] == '0' || ($mybb->input['lstat'] == '1' && $mybb->input['lparent'] != '0')))
+            // Wenn alle Pflichtangaben abgeschickt wurden, dann eintragen - oder Fehler eingeben.
+            if (
+                $mybb->request_method == 'post' && 
+                $mybb->input['lname'] != '' && 
+                (($mybb->input['lrid']!= '0' && $mybb->input['lstat'] == '0') || ($mybb->input['lstat'] == '1' && $mybb->input['lparent'] != '0')))
             {
                 // bei untergeordneten Ländern zur Sicherheit die richtige Region-ID raussuchen:
                 if ($mybb->input['lstat'] == '1')
@@ -1057,7 +1441,8 @@ function fcverw_admin()
                 // Wähle die Kontinent-ID:
                 $rsel = $db->simple_select("laender_regionen", "rkid", "rid = ".$mybb->input['lrid'], array('limit' => '1'));
                 $lkid = $db->fetch_field($rsel, 'rkid');
-
+            
+            
                 $insert_query = array(
                     'lkid' => (int)$lkid,
                     'lrid' => (int)$mybb->input['lrid'], 
@@ -1069,18 +1454,18 @@ function fcverw_admin()
                     'lstat' => (int)$mybb->input['lstat'],
                     'lparent' => (int)$mybb->input['lparent'],
                     'lverantw' => (int)$mybb->input['lverantw']
-                );
+                ); 
                 
                 if ($db->insert_query("laender", $insert_query))
                 {
                     redirect("admin/index.php?module=config-fcverw&action=laender");
-                } 
+                }
  
             }
             else
             {
                 // Wenn Ländername leer, dann Fehldermeldung generieren!
-                
+
                 if ((!$mybb->input['lname'] || $mybb->input['lname'] == '') && $mybb->request_method == 'post')
                 {
                     $l_fehler = " <b><font color='#ff0000'>Der L&auml;ndername muss ausgef&uuml;llt sein!</font></b>";
@@ -1092,10 +1477,12 @@ function fcverw_admin()
                 }
                 
                 // Wenn Untergeordnete Region = 1 und Übergeordnetes Land = 0, dann Fehlermeldung
-                if (($mybb->input['lstat'] == '1' && $mybb->input['lparent'] == '0') && $mybb->request_method == 'post')
+                if (($mybb->input['lstat'] == '1' && ($mybb->input['lparent'] == '0' || $mybb->input['lparent'] == '')) && $mybb->request_method == 'post')
                 {
                     $lu_fehler = " <b><font color='#ff000'>Es muss ein &uuml;bergeordnetes Land zugeordnet werden!</font></b>";
                 }
+
+                echo $l_fehler."<br>".$r_fehler."<br>".$lu_fehler;
 
                 $page->add_breadcrumb_item('Land anlegen');
                 $page->output_header('L&auml;nderverwaltung - Land anlegen');
@@ -1164,7 +1551,7 @@ function fcverw_admin()
                 
                 
                 // Funktion für das Auslesen der Kontinente und dazugehörigen Regionen
-                $reg = fcverw_KonReg();
+                $reg = fcverw_KonReg(0, 0);
                 while ($regdata = $db->fetch_array($reg))
                 {
                     //Regionen definieren für Variante 1 (nicht untergeordnet)
@@ -1172,7 +1559,7 @@ function fcverw_admin()
                     
                     // Angelegte Länder definieren für Variante 2 (untergeordnet)
                     // Aufruf Funktion für die Darstellung des Landes
-                    $query = fcverw_LandList($regdata['rid']);
+                    $query = fcverw_LandList($regdata['rid'], 0);
                     while ($landdata = $db->fetch_array($query))
                     {
                         $trenner = str_repeat("-", $landdata['Ebene']);
@@ -1279,21 +1666,541 @@ function fcverw_admin()
 // c. Länder
 // c3. Land editieren
 
+
+
 // c. Länder
 // c4. Land löschen
+        if ($mybb->input['action'] == "del_land")
+        {
+            $landid = $mybb->input['landid'];
+            
+            // Landdatan auslesen
+            $landsel = $db->simple_select("laender", "*", "ldelete = '0' AND landid = ".$landid, array("limit" => "1"));
+            $land = $db->fetch_array($landsel);
+            
+            // Wenn das Land ein Parent ist, dann ...
+            if ($land['lstat'] == '0')
+            {
+                // Prüfen, ob es archivierte Children gibt.
+                $childs = $db->simple_select("laender", "*", "lparent = ".$landid);
+                // Prüfen, ob es das Land vielleicht schon gibt, weil ein anderes Child umgetragen wurde
+                $probe = $db->num_rows($db->simple_select("laender_archive", "*", "lname = '".$land['lname']."' AND lstat = '".$land['lstat']."' AND lrid = '".$land['lrid']."'"));
+                
+                // Wenn es keine (archivierten) Childs gibt, dann ...
+                if ($db->num_rows($childs) == '0')
+                {
+                    // Wenn es das Land aktiv noch gar nicht gibt, dann eintragen und löschen
+                    if ($probe == '0')
+                    {
+                        $insert = array(
+                            "landid" => $land['landid'],
+                            "lname" => $land['lname'],
+                            "lkid" => $land['lkid'],
+                            "lrid" => $land['lrid'],
+                            "lkuerzel" => $land['lkuerzel'],
+                            "lart" => $land['lart'],
+                            "lreal" => $land['lreal'],
+                            "lbesp" => $land['lbesp'],
+                            "lstat" => $land['lstat'],
+                            "lparent" => $land['parent'],
+                            "lverantw" => $land['lverantw']
+                        );
+                        
+                        $db->insert_query("laender_archive", $insert);
+                        
+                        if ($db->delete_query("laender", "landid = ".$land['landid']))
+                        {
+                            redirect("admin/index.php?module=config-fcverw&action=laender");
+                        }
+                        
+                    }
+                    // Wenn das Land bereits existiert (warum auch immer), dann auf ganz aktiv stellen - soweit es nicht bereits der Fall ist.
+                    else 
+                    {
+                        $update = array(
+                            "ldelete" => '1'
+                        );
+                        
+                        $db->update_query("laender_archive", $update, "lname = '".$land['lname']."' AND lstat = '".$land['lstat']."' AND lrid = '".$land['lrid']."'", 1);
+                        
+                        if ($db->delete_query("laender", "landid = ".$land['landid']))
+                        {
+                            redirect("admin/index.php?module=config-fcverw&action=laender");
+                        }
+                        
+                    }
+                }
+                // Wenn das Land Childs hat, dann kopieren und entsprechend den Update-Query anpassen
+                else 
+                {
+                    // Wenn es das Land aktiv noch gar nicht gibt, dann eintragen und löschen
+                    if ($probe == '0')
+                    {
+                        $insert = array(
+                            "landid" => $land['landid'],
+                            "lname" => $land['lname'],
+                            "lkid" => $land['lkid'],
+                            "lrid" => $land['lrid'],
+                            "lkuerzel" => $land['lkuerzel'],
+                            "lart" => $land['lart'],
+                            "lreal" => $land['lreal'],
+                            "lbesp" => $land['lbesp'],
+                            "lstat" => $land['lstat'],
+                            "lparent" => $land['parent'],
+                            "lverantw" => $land['lverantw']
+                        );
+                        $db->insert_query("laender_archive", $insert);
+                        
+                        $update = array(
+                            "ldelete" => '1'
+                        );
+                        if ($db->update_query("laender", $update, "landid = ".$land['landid']))
+                        {
+                            redirect("admin/index.php?module=config-fcverw&action=laender");
+                        }
+                        
+                    }
+                    // Wenn das Land bereits existiert (warum auch immer), dann auf ganz aktiv stellen - soweit es nicht bereits der Fall ist.
+                    else 
+                    {
+                        $update = array(
+                            "ldelete" => '1'
+                        );
+                        
+                        $db->update_query("laender_archive", $update, "lname = '".$land['lname']."' AND lstat = '".$land['lstat']."' AND lrid = '".$land['lrid']."'", 1);
+                        
+                        // Und dann entsprechend hier updaten
+                        
+                        $update = array(
+                            "ldelete" => '1'
+                        );
+                        if ($db->update_query("laender", $update, "landid = ".$land['landid']))
+                        {
+                            redirect("admin/index.php?module=config-fcverw&action=laender");
+                        }
+                        
+                    }
+                }
+                
+            }
+            // Wenn es sich um ein untergeordnetes Land handelt ...
+            else
+            {
+                $landid = $mybb->input['landid'];
+                // Daten des Landes auslesen
+                $landdata = $db->fetch_array($db->simple_select("laender", "*", "landid = ".$landid));
+                
+                
+                // Wir arbeiten mit PathID - also allen IDs der Parents.
+                // Nehmen diese IDs auseindner - das können wir!
+                $PathID = $mybb->input['path'];
+                $paths = explode(",", $PathID);
+                $count = count($paths);
+                
+                // 1. Daten der Elter auslesen, abgleicen (ggf. eintragen mit Del = 1) -> ggf. lparent anpassen!
+                for ($i = 0; $i < ($count-1); $i++)
+                {
+                    // Daten Auslesen
+                    $parents = $db->simple_select("laender", "*", "landid = ".$paths[$i], array("limit" => "1"));
+                    $parent = $db->fetch_array($parents);
+                    
+                    // Prüfen, ob es einen solchen Datensatz bereits hat
+                    $probe = $db->num_rows($db->simple_select("laender_archive", "*", "lname = '".$parent['lname']."' AND lstat = '".$parent['lstat']."' AND lrid = '".$parent['lrid']."'"));
+                    
+                    $newID = 0;
+                    
+                    // Wenn nein, dann erstellen mti Del = 1 - und die ID merken!
+                    if ($probe == "0")
+                    {   
+                        $insert = array(
+                            "landid" => $parent['landid'],
+                            "lname" => $parent['lname'],
+                            "lkid" => $parent['lkid'],
+                            "lrid" => $parent['lrid'],
+                            "lkuerzel" => $parent['lkuerzel'],
+                            "lart" => $parent['lart'],
+                            "lreal" => $parent['lreal'],
+                            "lbesp" => $parent['lbesp'],
+                            "lstat" => $parent['lstat'],
+                            "lparent" => $newID,
+                            "lverantw" => $parent['lverantw'],
+                            "ldelete" => "0"
+                        );
+                        $db->insert_query("laender_archive", $insert);
+                        
+                        $newID = $db->insert_id();
+                    }
+                    // Wenn es bereits einen Eintrag gibt, dann LandID auslesen und entsprechend die NewID speichern für die nächste Runde.
+                    else 
+                    {
+                        $newID = $db->fetch_field($db->simple_select("laender_archive", "*", "lname = '".$parent['lname']."' AND lstat = '".$parent['lstat']."' AND lrid = '".$parent['lrid']."'", array("limit" => "1")), "landid");                  
+                    }
+                }
+
+                
+                // 2. Prüfen, ob das Child weitere Childs hat.
+                $childs = $db->simple_select("laender", "*", "lparent = ".$landid);
+                
+                
+                // Prüfen, ob entsprechender Eintrag besteht
+                $pruef = $db->simple_select("laender_archive", "landid", "lname = '".$landdata['lname']."' AND lstat = '".$landdata['lstat']."' AND lrid = '".$landdata['lrid']."'");
+                
+                
+                // Wenn noch kein Eintrag vorhanden, dann neu eintragen
+                if ($db->num_rows($pruef) == "0")
+                {
+                    $insert = array(
+                        "landid" => $landdata['landid'],
+                        "lname" => $landdata['lname'],
+                        "lkid" => $landdata['lkid'],
+                        "lrid" => $landdata['lrid'],
+                        "lkuerzel" => $landdata['lkuerzel'],
+                        "lart" => $landdata['lart'],
+                        "lreal" => $landdata['lreal'],
+                        "lbesp" => $landdata['lbesp'],
+                        "lstat" => $landdata['lstat'],
+                        "lparent" => $newID,
+                        "lverantw" => $landdata['lverantw']
+                    );
+                    $db->insert_query("laender_archive", $insert);
+                }
+                // Wenn ein Eintrag vorhanden, dann updaten
+                else 
+                {
+                    $update = array(
+                        "ldelete" => "1",
+                        "lparent" => $newID
+                    );
+                            
+                    $lid = $db->fetch_field($pruef, "landid");
+                            
+                    $db->update_query("laender_archive", $update, "landid = ".$lid);
+                }
+                    
+                    
+                // Wenn Childs nein, Datensatz löschen
+                if ($db->num_rows($childs) == "0")
+                {    
+                    if ($db->delete_query("laender", "landid = ".$landdata['landid']))
+                    {
+                        redirect("admin/index.php?module=config-fcverw&action=laender");
+                    } 
+                }    
+                else {
+                    $update2 = array(
+                        "ldelete" => "1"
+                    );
+                    
+                    if ($db->update_query("laender", $update2, "landid = ".$landdata['landid']))
+                    {
+                        redirect("admin/index.php?module=config-fcverw&action=laender");
+                    } 
+                }
+                                                                                                    
+            }
+
+        }
+
+// c. Länder
+// c5. Land wiederherstellen
+        if ($mybb->input['action'] == "re_land")
+        {
+            $landid = $mybb->input['landid'];
+            
+            // Landdatan auslesen
+            $landsel = $db->simple_select("laender_archive", "*", "ldelete = '1' AND landid = ".$landid, array("limit" => "1"));
+            $land = $db->fetch_array($landsel);
+            
+            // Wenn das Land ein Parent ist, dann ...
+            if ($land['lstat'] == '0')
+            {
+                // Prüfen, ob es archivierte Children gibt.
+                $childs = $db->simple_select("laender_archive", "*", "lparent = ".$landid);
+                // Prüfen, ob es das Land vielleicht schon gibt, weil ein anderes Child umgetragen wurde
+                $probe = $db->num_rows($db->simple_select("laender", "*", "lname = '".$land['lname']."' AND lstat = '".$land['lstat']."' AND lrid = '".$land['lrid']."'"));
+                
+                // Wenn es keine (archivierten) Childs gibt, dann ...
+                if ($db->num_rows($childs) == '0')
+                {
+                    // Wenn es das Land aktiv noch gar nicht gibt, dann eintragen und löschen
+                    if ($probe == '0')
+                    {
+                        $insert = array(
+                            "lname" => $land['lname'],
+                            "lkid" => $land['lkid'],
+                            "lrid" => $land['lrid'],
+                            "lkuerzel" => $land['lkuerzel'],
+                            "lart" => $land['lart'],
+                            "lreal" => $land['lreal'],
+                            "lbesp" => $land['lbesp'],
+                            "lstat" => $land['lstat'],
+                            "lparent" => $land['parent'],
+                            "lverantw" => $land['lverantw']
+                        );
+                        
+                        $db->insert_query("laender", $insert);
+                        
+                        if ($db->delete_query("laender_archive", "landid = ".$land['land']))
+                        {
+                            redirect("admin/index.php?module=config-fcverw&action=laender");
+                        }
+                        
+                    }
+                    // Wenn das Land bereits existiert (warum auch immer), dann auf ganz aktiv stellen - soweit es nicht bereits der Fall ist.
+                    else 
+                    {
+                        $update = array(
+                            "ldelete" => '0'
+                        );
+                        
+                        $db->update_query("laender", $update, "lname = '".$land['lname']."' AND lstat = '".$land['lstat']."' AND lrid = '".$land['lrid']."'", 1);
+                        
+                        if ($db->delete_query("laender_archive", "landid = ".$land['landid']))
+                        {
+                            redirect("admin/index.php?module=config-fcverw&action=laender");
+                        }
+                        
+                    }
+                }
+                // Wenn das Land Childs hat, dann kopieren und entsprechend den Update-Query anpassen
+                else 
+                {
+                    // Wenn es das Land aktiv noch gar nicht gibt, dann eintragen und löschen
+                    if ($probe == '0')
+                    {
+                        $insert = array(
+                            "lname" => $land['lname'],
+                            "lkid" => $land['lkid'],
+                            "lrid" => $land['lrid'],
+                            "lkuerzel" => $land['lkuerzel'],
+                            "lart" => $land['lart'],
+                            "lreal" => $land['lreal'],
+                            "lbesp" => $land['lbesp'],
+                            "lstat" => $land['lstat'],
+                            "lparent" => $land['parent'],
+                            "lverantw" => $land['lverantw']
+                        );
+                        $db->insert_query("laender", $insert);
+                        
+                        $update = array(
+                            "ldelete" => '0'
+                        );
+                        if ($db->update_query("laender_archive", $update, "landid = ".$land['landid']))
+                        {
+                            redirect("admin/index.php?module=config-fcverw&action=laender");
+                        }
+                        
+                    }
+                    // Wenn das Land bereits existiert (warum auch immer), dann auf ganz aktiv stellen - soweit es nicht bereits der Fall ist.
+                    else 
+                    {
+                        $update = array(
+                            "ldelete" => '0'
+                        );
+                        
+                        $db->update_query("laender", $update, "lname = '".$land['lname']."' AND lstat = '".$land['lstat']."' AND lrid = '".$land['lrid']."'", 1);
+                        
+                        // Und dann entsprechend hier updaten
+                        
+                        $update = array(
+                            "ldelete" => '0'
+                        );
+                        if ($db->update_query("laender_archive", $update, "landid = ".$land['landid']))
+                        {
+                            redirect("admin/index.php?module=config-fcverw&action=laender");
+                        }
+                        
+                    }
+                }
+                
+            }
+            // Wenn es sich um ein untergeordnetes Land handelt ...
+            else
+            {
+                $landid = $mybb->input['landid'];
+                // Daten des Landes auslesen
+                $landdata = $db->fetch_array($db->simple_select("laender_archive", "*", "landid = ".$landid));
+                
+                
+                // Wir arbeiten mit PathID - also allen IDs der Parents.
+                // Nehmen diese IDs auseindner - das können wir!
+                $PathID = $mybb->input['path'];
+                $paths = explode(",", $PathID);
+                $count = count($paths);
+                
+                // 1. Daten der Elter auslesen, abgleicen (ggf. eintragen mit Del = 1) -> ggf. lparent anpassen!
+                for ($i = 0; $i < ($count-1); $i++)
+                {
+                    // Daten Auslesen
+                    $parents = $db->simple_select("laender_archive", "*", "landid = ".$paths[$i], array("limit" => "1"));
+                    $parent = $db->fetch_array($parents);
+                    
+                    // Prüfen, ob es einen solchen Datensatz bereits hat
+                    $probe = $db->num_rows($db->simple_select("laender", "*", "lname = '".$parent['lname']."' AND lstat = '".$parent['lstat']."' AND lrid = '".$parent['lrid']."'"));
+                    
+                    $newID = 0;
+                    
+                    // Wenn nein, dann erstellen mti Del = 1 - und die ID merken!
+                    if ($probe == "0")
+                    {   
+                        $insert = array(
+                            "lname" => $parent['lname'],
+                            "lkid" => $parent['lkid'],
+                            "lrid" => $parent['lrid'],
+                            "lkuerzel" => $parent['lkuerzel'],
+                            "lart" => $parent['lart'],
+                            "lreal" => $parent['lreal'],
+                            "lbesp" => $parent['lbesp'],
+                            "lstat" => $parent['lstat'],
+                            "lparent" => $newID,
+                            "lverantw" => $parent['lverantw'],
+                            "ldelete" => "1"
+                        );
+                        $db->insert_query("laender", $insert);
+                        
+                        $newID = $db->insert_id();
+                    }
+                    // Wenn es bereits einen Eintrag gibt, dann LandID auslesen und entsprechend die NewID speichern für die nächste Runde.
+                    else 
+                    {
+                        $newID = $db->fetch_field($db->simple_select("laender", "*", "lname = '".$parent['lname']."' AND lstat = '".$parent['lstat']."' AND lrid = '".$parent['lrid']."'", array("limit" => "1")), "landid");                  
+                    }
+                }
+
+                
+                // 2. Prüfen, ob das Child weitere Childs hat.
+                $childs = $db->simple_select("laender_archive", "*", "lparent = ".$landid);
+                
+                
+                // Prüfen, ob entsprechender Eintrag besteht
+                $pruef = $db->simple_select("laender", "landid", "lname = '".$landdata['lname']."' AND lstat = '".$landdata['lstat']."' AND lrid = '".$landdata['lrid']."'");
+                
+                
+                // Wenn noch kein Eintrag vorhanden, dann neu eintragen
+                if ($db->num_rows($pruef) == "0")
+                {
+                    $insert = array(
+                        "lname" => $landdata['lname'],
+                        "lkid" => $landdata['lkid'],
+                        "lrid" => $landdata['lrid'],
+                        "lkuerzel" => $landdata['lkuerzel'],
+                        "lart" => $landdata['lart'],
+                        "lreal" => $landdata['lreal'],
+                        "lbesp" => $landdata['lbesp'],
+                        "lstat" => $landdata['lstat'],
+                        "lparent" => $newID,
+                        "lverantw" => $landdata['lverantw']
+                    );
+                    $db->insert_query("laender", $insert);
+                }
+                // Wenn ein Eintrag vorhanden, dann updaten
+                else 
+                {
+                    $update = array(
+                        "ldelete" => "0",
+                        "lparent" => $newID
+                    );
+                            
+                    $lid = $db->fetch_field($pruef, "landid");
+                            
+                    $db->update_query("laender", $update, "landid = ".$lid);
+                }
+                    
+                    
+                // Wenn Childs nein, Datensatz löschen
+                if ($db->num_rows($childs) == "0")
+                {    
+                    if ($db->delete_query("laender_archive", "landid = ".$landdata['landid']))
+                    {
+                        redirect("admin/index.php?module=config-fcverw&action=laender");
+                    } 
+                }    
+                else {
+                    $update2 = array(
+                        "ldelete" => "0"
+                    );
+                    
+                    if ($db->update_query("laender_archive", $update2, "landid = ".$landdata['landid']))
+                    {
+                        redirect("admin/index.php?module=config-fcverw&action=laender");
+                    } 
+                }
+                                                                                                    
+            }
+            
+        }
+
 
 
 // c. Länder
-// c5. Land - Diplomatie verwalten
+// c6. Land als vergeben kennzeichnen
+        if ($mybb->input['action'] == "take_land")
+        {
+            $landid = $mybb->input['landid'];
+            $update = array(
+                'lbesp' => '1'
+            );
+            
+            if ($db->update_query("laender", $update, "landid = ".$landid))
+            {
+                redirect("admin/index.php?module=config-fcverw&action=laender");
+            }
+        }
+
 
 // c. Länder
-// c6. Land - Verwandtschaft verwalten
+// c7. Land als frei kennzeichnen
+        if ($mybb->input['action'] == "free_land")
+        {
+            $landid = $mybb->input['landid'];
+            $update = array(
+                'lbesp' => '0',
+                'lverantw' => '0'
+            );
+            
+            if ($db->update_query("laender", $update, "landid = ".$landid))
+            {
+                redirect("admin/index.php?module=config-fcverw&action=laender");
+            }
+        }
+
 
 // c. Länder
-// c7. Land - Informationen vewalten
-
-// c. Länder
-// c8. Land - Familien verwalten
+// c8. Landdaten bereinigen
+        if ($mybb->input['action'] == "ber_laender")
+        {
+            // Unnötige Sachen löschen
+            
+            // 1. Hauptteil
+            $active = $db->simple_select("laender", "landid", "ldelete = '1'");
+            while ($act = $db->fetch_array($active))
+            {
+                // Prüfen, ob es aktive Children gibt
+                $child = $db->simple_select("laender", "landid, lparent", "lparent = ".$act['landid']);
+                
+                if ($db->num_rows($child) == '0')
+                {
+                    $db->delete_query("laender", "landid = ".$act['landid']);
+                }
+            }
+            
+            // 1. Archiv
+            $archive = $db->simple_select("laender_archive", "landid", "ldelete = '0'");
+            while ($arc = $db->fetch_array($archive))
+            {
+                // Prüfen, ob es aktive Children gibt
+                $childs = $db->simple_select("laender_archive", "landid, lparent", "lparent = ".$arc['landid']);
+                
+                if ($db->num_rows($childs) == '0')
+                {
+                    $db->delete_query("laender_archive", "landid = ".$arc['landid']);
+                }
+            }
+            
+            
+            redirect("admin/index.php?module=config-fcverw&action=laender");
+            
+        }
 
 
         $page->output_footer();
