@@ -44,14 +44,22 @@ function fcverw_KonReg($kdel, $rdel)
 }
 
 
-function fcverw_LandList($rid, $del)
+function fcverw_LandList($rid, $del, $lid)
 {
     global $db, $mybb, $landliste, $table;
     
     $table = "";
+    $parent = "";
+    
     if ($del == '1')
     {
         $table = "_archive";
+    }
+    
+    if ($lid != '0' && $lid != '')
+    {
+        $parent = "AND 
+            landid = ".$lid;
     }
     
     $landliste = $db->query("
@@ -94,6 +102,7 @@ function fcverw_LandList($rid, $del)
                     lrid = '".$rid."'
                         AND 
                     lparent = '0' 
+                    ".$parent."
                 
                 UNION ALL 
                 
