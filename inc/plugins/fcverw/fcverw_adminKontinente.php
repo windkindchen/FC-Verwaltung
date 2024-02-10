@@ -6,9 +6,9 @@ if (!defined('IN_MYBB')) {
         Please make sure IN_MYBB is defined.');
 }
 
-/* *************************************************
+/* *******************************************************************************************************************************************************************
        a1. Alle Kontinente anzeigen lassen
-************************************************* */
+******************************************************************************************************************************************************************* */
 
         if ($mybb->input['action'] == "kontinente")
         {
@@ -16,7 +16,7 @@ if (!defined('IN_MYBB')) {
             $page->add_breadcrumb_item('&Uuml;bersicht aller Kontinente');
             $page->output_header('L&auml;nderverwaltung - &Uuml;bersicht aller Kontinente');
         
-            // Welches Tab ist ausgewählt?
+            // Welches Tab ist ausgewÃ¤hlt?
             $page->output_nav_tabs($sub_tabs, 'kontinente');
             
             // Tabelle alle aktiven Kontinente
@@ -34,7 +34,7 @@ if (!defined('IN_MYBB')) {
             $fc_kontsel = $db->simple_select("laender_kontinente", "*", "kdelete = '0'", array('order_by' => 'kname'));
             while ($row = $db->fetch_array($fc_kontsel))
             {
-                // Auslesen der Anzahl der Regionen und Länder
+                // Auslesen der Anzahl der Regionen und LÃ¤nder
                 $regionena = $db->num_rows($db->simple_select("laender_regionen", "rid", "rdelete = '0' AND rkid = ".$row['kid']));
                 $regionenb = $db->num_rows($db->simple_select("laender_regionen", "rid", "rdelete = '1' AND rkid = ".$row['kid']));
                 $laendera = $db->num_rows($db->simple_select("laender", "landid", "ldelete = '0' AND lkid = ".$row['kid']));
@@ -48,7 +48,7 @@ if (!defined('IN_MYBB')) {
                 $form_container->output_cell($laendera." (".$laenderb.")", array("class" => "align_center"));
         
                 // Optionen-Fach basteln
-                //erst pop up dafür bauen - danke an @Risuena
+                //erst pop up dafÃ¼r bauen - danke an @Risuena
                 $popup = new PopupMenu("fcverw_".$row['kid'], "Optionen");
                 $popup->add_item(
                     "Editieren",
@@ -75,15 +75,15 @@ if (!defined('IN_MYBB')) {
             $form_container->output_row_header('L&auml;nder<br /> aktiv (archiviert)', array("class" => "align_center", "width" => "8%"));
             $form_container->output_row_header('Optionen', array("class" => "align_center", "width" => "15%"));
         
-            // Hier werden die gelöschten Kontinente ausgelesen
+            // Hier werden die gelÃ¶schten Kontinente ausgelesen
             $fc_kontsel2 = $db->simple_select("laender_kontinente", "*", "kdelete = '1'", array('order_by' => 'kname'));
             while ($row2 = $db->fetch_array($fc_kontsel2))
             {
-                // Auslesen der Anzahl der Regionen und Länder
+                // Auslesen der Anzahl der Regionen und LÃ¤nder
                 $regionena2 = $db->num_rows($db->simple_select("laender_regionen", "rid", "rdelete = '0' AND rkid = ".$row2['kid'])); // aktive regionen
-                $regionenb2 = $db->num_rows($db->simple_select("laender_regionen", "rid", "rdelete = '1' AND rkid = ".$row2['kid'])); // gelöschte regionen
+                $regionenb2 = $db->num_rows($db->simple_select("laender_regionen", "rid", "rdelete = '1' AND rkid = ".$row2['kid'])); // gelÃ¶schte regionen
                 $laendera2 = $db->num_rows($db->simple_select("laender", "landid", "ldelete = '0' AND lkid = ".$row2['kid'])); // aktive regionen
-                $laenderb2 = $db->num_rows($db->simple_select("laender_archive", "landid", "ldelete = '1' AND lkid = ".$row2['kid'])); // gelöschte regionen
+                $laenderb2 = $db->num_rows($db->simple_select("laender_archive", "landid", "ldelete = '1' AND lkid = ".$row2['kid'])); // gelÃ¶schte regionen
         
                 $form_container->output_cell($row2['kid'], array("class" => "align_center"));
                 $form_container->output_cell("<b>".$row2['kname']."</b>");
@@ -92,7 +92,7 @@ if (!defined('IN_MYBB')) {
                 $form_container->output_cell($laendera2." (".$laenderb2.")", array("class" => "align_center"));
         
                 // Optionen-Fach basteln
-                //erst pop up dafür bauen - danke an @Risuena
+                //erst pop up dafÃ¼r bauen - danke an @Risuena
                 $popup2 = new PopupMenu("fcverw_".$row2['kid'], "Optionen");
                 $popup2->add_item(
                     "Editieren",
@@ -110,12 +110,15 @@ if (!defined('IN_MYBB')) {
             
             $form->end();
             
-        } // Ende der Kontinentübersicht
+        } // Ende der KontinentÃ¼bersicht
         
         
         
-        // a. Kontinente
-// a2. Neuen Kontinent anlegen
+
+/* *******************************************************************************************************************************************************************
+       a2. Neuen Kontinent erstellen
+******************************************************************************************************************************************************************* */
+
         if ($mybb->input['action'] == "add_kontinent")
         {
             // Wenn alle Pflichtangaben abgeschickt wurden, dann eintragen
@@ -181,8 +184,11 @@ if (!defined('IN_MYBB')) {
 
 
 
-// a. Kontinente
-// a3. Kontinent editieren
+
+/* *******************************************************************************************************************************************************************
+       a3. Kontinent editieren
+******************************************************************************************************************************************************************* */
+
         if ($mybb->input['action'] == "edit_kontinent")
         {
             // Eintrag machen
@@ -190,7 +196,7 @@ if (!defined('IN_MYBB')) {
             {
                 if ($mybb->input['kdelete'] == '1')
                 {
-                    // Länder kopieren und löschen
+                    // LÃ¤nder kopieren und lÃ¶schen
                     $landselect = $db->simple_select("laender", "*", "lkid = ".$mybb->input['kid'], array("order_by" => 'landid'));
                     while ($landdata = $db->fetch_array($landselect))
                     {
@@ -208,7 +214,7 @@ if (!defined('IN_MYBB')) {
                             "lverantw" => $landdata['lverantw']
                         );
                         
-                        // Prüfen, ob das Land mit der LandID bereits vorhanden ist
+                        // PrÃ¼fen, ob das Land mit der LandID bereits vorhanden ist
                         $probe = $db->simple_select("laender_archive", "*", "landid = ".$landdata['landid']);
                         // Wenn Ergebnis = 0, dann eintragen - ansonsten nicht.
                         if ($db->num_rows($probe) == '0')
@@ -216,7 +222,7 @@ if (!defined('IN_MYBB')) {
                             $db->insert_query("laender_archive", $insert);
                         }
                         
-                        // Hier in jedem Fall alle löschen.
+                        // Hier in jedem Fall alle lÃ¶schen.
                         $db->delete_query("laender", "landid = ".$landdata['landid']);
                     }
                     
@@ -243,7 +249,7 @@ if (!defined('IN_MYBB')) {
             else
             {
                 // Formular anzeigen
-                // Neues Tab kreieren, das nur während des Editierens vorhanden ist.
+                // Neues Tab kreieren, das nur wÃ¤hrend des Editierens vorhanden ist.
                 $sub_tabs['edit_kontinent'] = array(
                     'title' => 'Kontinent editieren',
                     'link' => 'index.php?module=config-fcverw&amp;action=edit_kontinent&amp;kid='.$mybb->input['kid'],
@@ -259,18 +265,18 @@ if (!defined('IN_MYBB')) {
                 $form = new Form("index.php?module=config-fcverw&amp;action=edit_kontinent", "post", "", 1);
                 $form_container = new FormContainer('Kontinent editieren');
                 
-                // ID mitgeben über verstecktes Feld
+                // ID mitgeben Ã¼ber verstecktes Feld
                 echo $form->generate_hidden_field('kid', $mybb->input['kid']);
 
                 // Daten holen
                 $dataget = $db->simple_select("laender_kontinente", "*", "kid = ".$mybb->input['kid']);
                 $data = $db->fetch_array($dataget);
 
-                // Fehlermeldung ausgeben, wenn Name nicht ausgefüllt
+                // Fehlermeldung ausgeben, wenn Name nicht ausgefÃ¼llt
                 if ((!$mybb->input['kname'] || $mybb->input['kname'] == '') && $mybb->request_method == 'post')
                 {
                     $l_fehler = " <b><font color='#ff0000'>Der Kontinentname muss ausgef&uuml;llt sein!</font></b>";
-                    // Daten überschreiben
+                    // Daten Ã¼berschreiben
                     $data['kname'] = $mybb->input['kname'];
                     $data['kbeschr'] = $mybb->input['kbeschr'];
                 }
@@ -307,7 +313,7 @@ if (!defined('IN_MYBB')) {
                         $mybb->input['kdelete'] = $data['kdelete'];
                     }
                     
-                    // Gelöschtes Land wiederherstellen?
+                    // GelÃ¶schtes Land wiederherstellen?
                     $form_container->output_row(
                         'Wiederherstellen',
                         'Soll der archivierte Kontinent wiederhergestellt werden?',
@@ -329,7 +335,7 @@ if (!defined('IN_MYBB')) {
                         $mybb->input['kdelete'] = $data['kdelete'];
                     }
                     
-                    // Gelöschtes Land wiederherstellen?
+                    // GelÃ¶schtes Land wiederherstellen?
                     $form_container->output_row(
                         'Archivieren?',
                         'Soll der Kontinent archiviert werden?',
@@ -351,14 +357,16 @@ if (!defined('IN_MYBB')) {
 
 
 
-// a. Kontinente
-// a4. Kontinent löschen
+/* *******************************************************************************************************************************************************************
+       a4. Kontinent archivieren
+******************************************************************************************************************************************************************* */
+
         if ($mybb->input['action'] == "del_kontinent")
         {
             $kid = (int)$mybb->input['kid'];
 
-            // Länder updaten
-            // Länder kopieren und löschen
+            // LÃ¤nder updaten
+            // LÃ¤nder kopieren und lÃ¶schen
             $landselect = $db->simple_select("laender", "*", "lkid = ".$mybb->input['kid'], array("order_by" => 'landid'));
             while ($landdata = $db->fetch_array($landselect))
             {
@@ -376,7 +384,7 @@ if (!defined('IN_MYBB')) {
                     "lverantw" => $landdata['lverantw']
                 );
                             
-                // Prüfen, ob das Land mit der LandID bereits vorhanden ist
+                // PrÃ¼fen, ob das Land mit der LandID bereits vorhanden ist
                 $probe = $db->simple_select("laender_archive", "*", "landid = ".$landdata['landid']);
                 // Wenn Ergebnis = 0, dann eintragen - ansonsten nicht.
                 if ($db->num_rows($probe) == '0')
@@ -384,7 +392,7 @@ if (!defined('IN_MYBB')) {
                     $db->insert_query("laender_archive", $insert);
                 }
                             
-                // Hier in jedem Fall alle löschen.
+                // Hier in jedem Fall alle lÃ¶schen.
                 $db->delete_query("laender", "landid = ".$landdata['landid']);
             }
 
@@ -395,7 +403,7 @@ if (!defined('IN_MYBB')) {
             $db->update_query("laender_regionen", $update_regionen, "rkid = ".$kid);
 
 
-            // Eintrag abändern - Delete = 1
+            // Eintrag abÃ¤ndern - Delete = 1
             $update = array(
                 'kdelete' => '1'
             );
@@ -405,17 +413,19 @@ if (!defined('IN_MYBB')) {
                 redirect("admin/index.php?module=config-fcverw&action=kontinente");
             }
 
-        } // Ende Löschen Kontinent
+        } // Ende LÃ¶schen Kontinent
 
 
 
-// a. Kontinente
-// a5. Kontinent wiederherstellen
+/* *******************************************************************************************************************************************************************
+       a5. Kontinent wiederherstellen
+******************************************************************************************************************************************************************* */
+
         if ($mybb->input['action'] == "re_kontinent")
         {
             $kid = (int)$mybb->input['kid'];
 
-            // Eintrag abändern - Delete = 0
+            // Eintrag abÃ¤ndern - Delete = 0
             $update = array(
                 'kdelete' => '0'
             );
@@ -425,4 +435,4 @@ if (!defined('IN_MYBB')) {
                 redirect("admin/index.php?module=config-fcverw&action=kontinente");
             }
 
-        } // Ende Löschen Kontinent
+        } // Ende Wiederherstellen Kontinent
