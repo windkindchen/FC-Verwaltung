@@ -242,6 +242,7 @@ function fcverw_deactivate()
    ********************************************************************************************** */
 // Load the Globals that are for everything
 require_once MYBB_ROOT.'inc/plugins/fcverw/fcverw_global.php';
+require_once MYBB_ROOT.'inc/class_parser.php';
 
 
 
@@ -289,12 +290,27 @@ function fcverw_admin_config_action_handler(&$actions)
 $plugins->add_hook('admin_load', 'fcverw_admin');
 function fcverw_admin()
 {
-    global $mybb, $db, $lang, $page, $action_file, $run_module, $form, $land, $i;
-
+    global $mybb, $db, $lang, $page, $action_file, $run_module, $form, $parser;
+    
     if ($page->active_action != 'fcverw')
     {
    	    return false;
     }
+    
+    
+    // Parser für Texte
+    $parser = new postParser;
+    // Do something, for example I'll create a page using the hello_world_template
+    $options = array(
+        "allow_html" => 1,
+        "allow_mycode" => 1,
+        "allow_smilies" => 1,
+        "allow_imgcode" => 1,
+        "filter_badwords" => 0,
+        "nl2br" => 1,
+        "allow_videocode" => 1
+    );
+    
 
 // Wenn Das Module config ist und das Action File fcverw, 
 // dann beginnt die Magic.
@@ -310,7 +326,8 @@ function fcverw_admin()
             'link'	=> 'index.php?module=config-fcverw',
             'description'   => '&Uuml;bersicht aller L&auml;nder, aufgeteilt nach aktiven und archivierten Ländern. <br />
             Wichtig: Wenn viele Länder wiederhergestellt wurden, dann zur Sicherheit <b><a href="index.php?module=config-fcverw&amp;action=ber_laender">Daten bereinigen</a></b>.<br /><br />
-  			<img src="fcverw/frei.png"> Land frei; <img src="fcverw/vergeben.png"> Land vergeben; <img src="fcverw/error.png"> Land vergeben ohne Verantwortlichen'
+  			<b>Allgemein</b>: <img src="fcverw/frei.png"> Land frei; <img src="fcverw/vergeben.png"> Land vergeben; <img src="fcverw/error.png"> Land vergeben ohne Verantwortlichen<br /><br />
+            <b>L&auml;nderinformation</b>: <img src="fcverw/frei.png"> L&auml;nderinfo freigegeben ; <img src="fcverw/vergeben.png"> keine L&auml;nderinfo; <img src="fcverw/error.png"> L&auml;nderinfo muss freigegeben werden'
         );
         $sub_tabs['add_land'] = array(
             'title' => 'Land anlegen',
@@ -340,20 +357,20 @@ function fcverw_admin()
 
 
 
-
-
-// a. Kontinente
-require_once MYBB_ROOT.'inc/plugins/fcverw/fcverw_adminKontinente.php';
-            
-
-// b. Regionen
-require_once MYBB_ROOT.'inc/plugins/fcverw/fcverw_adminRegionen.php';
-
-
-
-
-// c. Länder - Allgemein
-require_once MYBB_ROOT.'inc/plugins/fcverw/fcverw_adminLaender.php';
+        // a. Kontinente
+        require_once MYBB_ROOT.'inc/plugins/fcverw/fcverw_adminKontinente.php';
+                    
+        
+        // b. Regionen
+        require_once MYBB_ROOT.'inc/plugins/fcverw/fcverw_adminRegionen.php';
+        
+        
+        // c. Länder - Allgemein
+        require_once MYBB_ROOT.'inc/plugins/fcverw/fcverw_adminLaender.php';
+        
+        
+        // d. Länder - Allgemein
+        require_once MYBB_ROOT.'inc/plugins/fcverw/fcverw_adminLandinfo.php';
 
 
 
