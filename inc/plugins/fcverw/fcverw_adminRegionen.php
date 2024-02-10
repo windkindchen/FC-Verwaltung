@@ -7,13 +7,16 @@ if (!defined('IN_MYBB')) {
 }
 
 
-// b1. Alle Regionen anzeigen
+/* *******************************************************************************************************************************************************************
+       b1. Regionen anzeigen
+******************************************************************************************************************************************************************* */
+
         if ($mybb->input['action'] == "regionen")
         {
             $page->add_breadcrumb_item('&Uuml;bersicht aller Regionen');
             $page->output_header('L&auml;nderverwaltung - &Uuml;bersicht aller Regionen');
 
-            // Welches Tab ist ausgewählt?
+            // Welches Tab ist ausgewÃ¤hlt?
             $page->output_nav_tabs($sub_tabs, 'regionen');
 
             // Tabelle kreieren - Headerzeile
@@ -29,7 +32,7 @@ if (!defined('IN_MYBB')) {
             $fc_regsel = fcverw_KonReg(0, 0);
             while ($row = $db->fetch_array($fc_regsel))
             {
-                // Auslesen der Anzahl der Länder
+                // Auslesen der Anzahl der LÃ¤nder
                 $laendera = $db->num_rows($db->simple_select("laender", "landid", "ldelete = '0' AND lrid = ".$row['rid']));
                 $laenderb = $db->num_rows($db->simple_select("laender_archive", "landid", "ldelete = '1' AND lrid = ".$row['rid']));
 
@@ -39,7 +42,7 @@ if (!defined('IN_MYBB')) {
                 $form_container->output_cell($laendera." (".$laenderb.")", array("class" => "align_center"));
 
                 // Optionen-Fach basteln
-                //erst pop up dafür bauen - danke an @Risuena
+                //erst pop up dafÃ¼r bauen - danke an @Risuena
                 $popup = new PopupMenu("fcverw_".$row['rid'], "Optionen");
                 $popup->add_item(
                     "Editieren",
@@ -67,7 +70,7 @@ if (!defined('IN_MYBB')) {
             $fc_regsel2 = fcverw_KonReg(0, 1);
             while ($row2 = $db->fetch_array($fc_regsel2))
             {
-                // Auslesen der Anzahl der Regionen und Länder
+                // Auslesen der Anzahl der Regionen und LÃ¤nder
                 $laendera2 = $db->num_rows($db->simple_select("laender", "landid", "lrid = ".$row2['rid']));
                 $laenderb2 = $db->num_rows($db->simple_select("laender_archive", "landid", "lrid = ".$row2['rid']));
 
@@ -77,7 +80,7 @@ if (!defined('IN_MYBB')) {
                 $form_container->output_cell($laendera2." (".$laenderb2.")", array("class" => "align_center"));
 
                 // Optionen-Fach basteln
-                //erst pop up dafür bauen - danke an @Risuena
+                //erst pop up dafÃ¼r bauen - danke an @Risuena
                 $popup2 = new PopupMenu("fcverw_".$row2['rid'], "Optionen");
                 $popup2->add_item(
                     "Editieren",
@@ -102,11 +105,11 @@ if (!defined('IN_MYBB')) {
             $form_container->output_row_header('Optionen', array("class" => "align_center", "width" => "15%"));
 
 
-            // Hier werden die Regionen in gelöschten Kontinenten ausgelesen
+            // Hier werden die Regionen in gelÃ¶schten Kontinenten ausgelesen
             $fc_regsel3 = fcverw_KonReg(1, 2);
             while ($row3 = $db->fetch_array($fc_regsel3))
             {
-                // Auslesen der Anzahl der Regionen und Länder
+                // Auslesen der Anzahl der Regionen und LÃ¤nder
                 $laendera3 = $db->num_rows($db->simple_select("laender", "landid", "lrid = ".$row3['rid']));
                 $laenderb3 = $db->num_rows($db->simple_select("laender_archive", "landid", "lrid = ".$row3['rid']));
 
@@ -125,11 +128,13 @@ if (!defined('IN_MYBB')) {
             
             
             $form->end();
-        } // Ende der Regionenübersicht
+        } // Ende der RegionenÃ¼bersicht
 
 
-// b. Regionen
-// b2. Region anlegen
+/* *******************************************************************************************************************************************************************
+       b2. Neue Region anlegen
+******************************************************************************************************************************************************************* */
+
         if ($mybb->input['action'] == "add_region")
         {
             // Wenn alle Pflichtangaben abgeschickt wurden, dann eintragen
@@ -221,18 +226,23 @@ if (!defined('IN_MYBB')) {
         } // Ende Region anlegen
 
 
-// b. Regionen
-// b3. Region editieren
+
+
+/* *******************************************************************************************************************************************************************
+       b3. Region bearbeiten
+******************************************************************************************************************************************************************* */
+
+
         if ($mybb->input['action'] == "edit_region")
         {
             // Eintrag machen
             if ($mybb->request_method == 'post' && $mybb->input['rname'] != '')
             {
-                // Länder updaten
+                // LÃ¤nder updaten
                 if ($mybb->input['rdelete'] == '1')
                 {
-                    // Länder updaten
-                    // Länder kopieren und löschen
+                    // LÃ¤nder updaten
+                    // LÃ¤nder kopieren und lÃ¶schen
                     $landselect = $db->simple_select("laender", "*", "lrid = ".$mybb->input['rid'], array("order_by" => 'landid'));
                     while ($landdata = $db->fetch_array($landselect))
                     {
@@ -250,7 +260,7 @@ if (!defined('IN_MYBB')) {
                             "lverantw" => $landdata['lverantw']
                         );
                                     
-                        // Prüfen, ob das Land mit der LandID bereits vorhanden ist
+                        // PrÃ¼fen, ob das Land mit der LandID bereits vorhanden ist
                         $probe = $db->simple_select("laender_archive", "*", "landid = ".$landdata['landid']);
                         // Wenn Ergebnis = 0, dann eintragen - ansonsten nicht.
                         if ($db->num_rows($probe) == '0')
@@ -258,7 +268,7 @@ if (!defined('IN_MYBB')) {
                             $db->insert_query("laender_archive", $insert);
                         }
                                     
-                        // Hier in jedem Fall alle löschen.
+                        // Hier in jedem Fall alle lÃ¶schen.
                         $db->delete_query("laender", "landid = ".$landdata['landid']);
                     }
         
@@ -280,7 +290,7 @@ if (!defined('IN_MYBB')) {
             else
             {
                 // Formular anzeigen
-                // Neues Tab kreieren, das nur während des Editierens vorhanden ist.
+                // Neues Tab kreieren, das nur wÃ¤hrend des Editierens vorhanden ist.
                 $sub_tabs['edit_region'] = array(
                     'title' => 'Region editieren',
                     'link' => 'index.php?module=config-fcverw&amp;action=edit_region&amp;rid='.$mybb->input['rid'],
@@ -296,27 +306,27 @@ if (!defined('IN_MYBB')) {
                 $form = new Form("index.php?module=config-fcverw&amp;action=edit_region", "post", "", 1);
                 $form_container = new FormContainer('Region editieren');
                 
-                // ID mitgeben über verstecktes Feld
+                // ID mitgeben Ã¼ber verstecktes Feld
                 echo $form->generate_hidden_field('rid', $mybb->input['rid']);
 
                 // Daten holen
                 $dataget = $db->simple_select("laender_regionen", "*", "rid = ".$mybb->input['rid']);
                 $data = $db->fetch_array($dataget);
 
-                // Fehlermeldung ausgeben, wenn Name nicht ausgefüllt
+                // Fehlermeldung ausgeben, wenn Name nicht ausgefÃ¼llt
                 if ((!$mybb->input['rname'] || $mybb->input['rname'] == '') && $mybb->request_method == 'post')
                 {
                     $l_fehler = " <b><font color='#ff0000'>Der Regionenname muss ausgef&uuml;llt sein!</font></b>";
-                    // Daten überschreiben
+                    // Daten Ã¼berschreiben
                     $data['rname'] = $mybb->input['rname'];
                     $data['rbeschr'] = $mybb->input['rbeschr'];
                     $data['rkid'] = $mybb->input['rkid'];
                 }
-                // Fehlermeldung, wenn Kontinent nicht augefüllt
+                // Fehlermeldung, wenn Kontinent nicht augefÃ¼llt
                 if ((!$mybb->input['rkid'] || $mybb->input['rkid'] == '' || $mybb->input['rkid'] == '0') && $mybb->request_method == 'post')
                 {
                     $k_fehler = " <b><font color='#ff0000'>Es muss ein Kontinent ausgew&auml;hlt werden!</font></b>";
-                    // Daten überschreiben
+                    // Daten Ã¼berschreiben
                     $data['rname'] = $mybb->input['rname'];
                     $data['rbeschr'] = $mybb->input['rbeschr'];
                     $data['rkid'] = $mybb->input['rkid'];
@@ -376,7 +386,7 @@ if (!defined('IN_MYBB')) {
                         $mybb->input['rdelete'] = $data['rdelete'];
                     }
                     
-                    // Gelöschtes Region wiederherstellen?
+                    // GelÃ¶schtes Region wiederherstellen?
                     $form_container->output_row(
                         'Wiederherstellen',
                         'Soll die archivierte Region wiederhergestellt werden?',
@@ -398,7 +408,7 @@ if (!defined('IN_MYBB')) {
                         $mybb->input['rdelete'] = $data['rdelete'];
                     }
                     
-                    // Gelöschtes Region wiederherstellen?
+                    // GelÃ¶schtes Region wiederherstellen?
                     $form_container->output_row(
                         'Archivieren?',
                         'Soll die Region archiviert werden?',
@@ -420,14 +430,18 @@ if (!defined('IN_MYBB')) {
         } // Ende Editieren Region
 
 
-// b. Regionen
-// b4. Region löschen
+
+
+/* *******************************************************************************************************************************************************************
+       b4. Region archivieren
+******************************************************************************************************************************************************************* */
+
         if ($mybb->input['action'] == "del_region")
         {
             $rid = (int)$mybb->input['rid'];
 
-            // Länder updaten
-            // Länder kopieren und löschen
+            // LÃ¤nder updaten
+            // LÃ¤nder kopieren und lÃ¶schen
             $landselect = $db->simple_select("laender", "*", "lrid = ".$mybb->input['rid'], array("order_by" => 'landid'));
             while ($landdata = $db->fetch_array($landselect))
             {
@@ -445,7 +459,7 @@ if (!defined('IN_MYBB')) {
                     "lverantw" => $landdata['lverantw']
                 );
                             
-                // Prüfen, ob das Land mit der LandID bereits vorhanden ist
+                // PrÃ¼fen, ob das Land mit der LandID bereits vorhanden ist
                 $probe = $db->simple_select("laender_archive", "*", "landid = ".$landdata['landid']);
                 // Wenn Ergebnis = 0, dann eintragen - ansonsten nicht.
                 if ($db->num_rows($probe) == '0')
@@ -453,11 +467,11 @@ if (!defined('IN_MYBB')) {
                     $db->insert_query("laender_archive", $insert);
                 }
                             
-                // Hier in jedem Fall alle löschen.
+                // Hier in jedem Fall alle lÃ¶schen.
                 $db->delete_query("laender", "landid = ".$landdata['landid']);
             }
 
-            // Eintrag abändern - Delete = 1
+            // Eintrag abÃ¤ndern - Delete = 1
             $update = array(
                 'rdelete' => '1'
             );
@@ -467,16 +481,19 @@ if (!defined('IN_MYBB')) {
                 redirect("admin/index.php?module=config-fcverw&action=regionen");
             }
             
-        } // Ende Löschen Region
+        } // Ende LÃ¶schen Region
 
 
-// b. Regionen
-// b5. Region wiederhierstellen
+
+/* *******************************************************************************************************************************************************************
+       b5. Region wiederherstellen
+******************************************************************************************************************************************************************* */
+
         if ($mybb->input['action'] == "re_region")
         {
             $rid = (int)$mybb->input['rid'];
 
-            // Eintrag abändern - Delete = 0
+            // Eintrag abÃ¤ndern - Delete = 0
             $update = array(
                 'rdelete' => '0'
             );
@@ -489,4 +506,4 @@ if (!defined('IN_MYBB')) {
             
            
 
-        } // Ende Löschen Region
+        } // Ende Wiederherstellen Region
