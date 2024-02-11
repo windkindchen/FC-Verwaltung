@@ -1,10 +1,24 @@
 <?php
+    // Disallow direct access to this file for security reasons
+    if (!defined('IN_MYBB')) {
+        die('Direct initialization of this file is not allowed.<br /><br />
+            Please make sure IN_MYBB is defined.');
+    }
 
-// Disallow direct access to this file for security reasons
-if (!defined('IN_MYBB')) {
-    die('Direct initialization of this file is not allowed.<br /><br />
-        Please make sure IN_MYBB is defined.');
-}
+
+/* *******************************************************************************************************************************************************************
+       Inhalt Dokument c. Länder
+******************************************************************************************************************************************************************* */
+
+    // 1. laender - Alle Länder anzeigen
+    // 2. add_land - Land anlegen
+    // 3. edit_land - Land editieren
+    // 4. del_land - Land archivieren
+    // 5. re_land - Land wiederherstellen
+    // 6. take_land - Schnellvergabe
+    // 7. free_land - Schnellfreigabe
+    // 8. ber_land - Daten bereinigen
+
 
 
 /* *******************************************************************************************************************************************************************
@@ -1527,5 +1541,4 @@ if (!defined('IN_MYBB')) {
             
             
             redirect("admin/index.php?module=config-fcverw&action=laender");
-            
         }
