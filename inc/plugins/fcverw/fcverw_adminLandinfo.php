@@ -7,559 +7,515 @@
 
 
 /* *******************************************************************************************************************************************************************
-       Inhalt Dokument d. Länderinfos
+       Inhalt Dokument b. Regionen
 ******************************************************************************************************************************************************************* */
 
-    // 0. Unabhängige Variablen
-    // 1. show_landinfo
-    // 2. add_landinfo
-    // 3. control_landinfo
-    // 4. free_landinfo
-    // 5. new_landinfo
-    // 6. vergl_landinfo
-    // 7. edit_landinfo
+    // 1. regionen - Anzeige aller Regionen
+    // 2. add_region - Neue Region anlegen
+    // 3. edit_region - Region editieren
+    // 4. del_region - Region archivieren
+    // 5. re_region - Region wiederherstellen
 
 
 
 /* *******************************************************************************************************************************************************************
-       d0. Unabhängige Variablen
+       b1. Regionen anzeigen
 ******************************************************************************************************************************************************************* */
 
-    $themen = array(
-        "allgemein" => "Allgemeine Informationen",
-        "hauptstadt" => "Hauptstadt",
-        "sprache" => "Amtssprache und verbreitete Sprachen",
-        "royal" => "K&ouml;nigliche Familie und Thronfolge",
-        "regierung" => "Landespolitik",
-        "diplomatie" => "Diplomatische Grunds&auml;tze",
-        "volk" => "Bev&ouml;lkerungsdaten",
-        "religion" => "Religion und Glaube", 
-        "einwanderung" => "Einwanderungspolitik",
-        "wirtschaft" => "Wirtschaft",
-        "militaer" => "Milit&auml;r",
-        "medien" => "Medien und Pressefreiheit",
-        "rebellen" => "Rebellen",
-        "sonstiges" => "Sonstige Informationen"
-    );
-
-
-
-
-/* *******************************************************************************************************************************************************************
-       d1. Aktuelle freigegebene Länderinformation anzeigen
-******************************************************************************************************************************************************************* */
-
-    if ($mybb->input['action'] == 'show_landinfo')
-    {
-        // Daten der aktuell freigegebenen Version auslesen
-        $landid = (int)$mybb->input['landid'];
-        $archive = (int)$mybb->input['archive'];
-        
-        
-        $archivet = "";
-        if ($archive == '1')
+        if ($mybb->input['action'] == "regionen")
         {
-            $archivet = "_archive";
-        }
-        
-        $select = $db->write_query("
-            SELECT 
-                li.*, l.lname, l.lart 
-            FROM 
-                ".TABLE_PREFIX."laender_info li 
-            LEFT JOIN 
-                ".TABLE_PREFIX."laender".$archivet." l 
-            ON 
-                li.landid = l.landid 
-            WHERE 
-                li.landid = ".$landid." 
-                    AND 
-                li.lifreigabe = '1' 
-            ORDER BY 
-                li.lidatum DESC 
-            LIMIT 1
-        ");
-        
-        $data = $db->fetch_array($select);
-        
-        // Neues Tab kreieren, das nur während des Anzeigens vorhanden ist.
-        $sub_tabs['show_landinfo'] = array(
-            'title' => 'L&auml;nderinfo anzeigen',
-            'link' => 'index.php?module=config-fcverw&amp;action=show_landinfo&amp;archive='.$archive.'&amp;landid='.$landid,
-            'description' => 'Anzeige der aktuellsten, freigegebenen L&auml;nderinformation von <b>'.$data['lart'].' '.$data['lname'].'</b>.'
-        );
-        
-        $page->add_breadcrumb_item('['.$data['lart'].' '.$data['lname'].'] Aktuelle L&auml;nderbeschreibung anzeigen');
-        $page->output_header('L&auml;nderverwaltung - ['.$data['lart'].' '.$data['lname'].'] Aktuelle L&auml;nderbeschreibung anzeigen');
-        
-        $page->output_nav_tabs($sub_tabs, 'show_landinfo');
-        
-        
-        // Jetzt die Daten anzeigen
-        $form = new Form("index.php?module=config-fcverw&amp;action=edit_kontinent", "post", "", 1);
-        $form_container = new FormContainer('L&auml;nderinformation von '.$data['lart'].' '.$data['lname'].'</b>.');
-        
-        
-        foreach ($themen AS $thema => $lititel)
-        {
-            $form_container->output_row(
-                $lititel,
-                '',
-                '<div style="width: 75%; max-height: 300px; overflow: auto; margin-left: 60px; line-height: 1.6; padding: 10px;">'.nl2br($data[$thema]).'</div><br />'
-            );
-        }
-        
-        $form_container->end();
-        $form->end();
-        
-        
-    } // Ende Länderinfos anzeigen
-    
-    
-    
-    
-/* *******************************************************************************************************************************************************************
-       d2. Neue Länderinformation anlegen
-******************************************************************************************************************************************************************* */
+            $page->add_breadcrumb_item('&Uuml;bersicht aller Regionen');
+            $page->output_header('L&auml;nderverwaltung - &Uuml;bersicht aller Regionen');
 
-    if ($mybb->input['action'] == 'add_landinfo')
-    {
-        // Daten der aktuell freigegebenen Version auslesen
-        $landid = (int)$mybb->input['landid'];
-        
-        
-        if ($mybb->request_method == 'post')
-        {
-            // Eintragen
-            $insert = array();
-            $insert['landid'] = $landid;
-            
-            foreach ($themen AS $thema => $lititel)
+            // Welches Tab ist ausgewählt?
+            $page->output_nav_tabs($sub_tabs, 'regionen');
+
+            // Tabelle kreieren - Headerzeile
+            $form = new Form("index.php?module=config-fcverw", "post");
+            $form_container = new FormContainer('Alle aktiven Regionen (in aktiven Kontinenten)');
+            $form_container->output_row_header('ID', array("class" => "align_center", "width" => "5%"));
+            $form_container->output_row_header('Regionenname', array("class" => "align_center", "width" => "25%"));
+            $form_container->output_row_header('Beschreibung', array("class" => "align_center"));
+            $form_container->output_row_header('L&auml;nder<br>aktiv (archiviert)', array("class" => "align_center", "width" => "10%"));
+            $form_container->output_row_header('Optionen', array("class" => "align_center", "width" => "15%"));
+
+            // Hier werden die aktiven Regionen ausgelesen
+            $fc_regsel = fcverw_KonReg(0, 0);
+            while ($row = $db->fetch_array($fc_regsel))
             {
-                $insert[$thema] = $mybb->input[$thema];
+                // Auslesen der Anzahl der Länder
+                $laendera = $db->num_rows($db->simple_select("laender", "landid", "ldelete = '0' AND lrid = ".$row['rid']));
+                $laenderb = $db->num_rows($db->simple_select("laender_archive", "landid", "ldelete = '1' AND lrid = ".$row['rid']));
+
+                $form_container->output_cell($row['rid'], array("class" => "align_center"));
+                $form_container->output_cell("[".$row['kname']."] <b>".$row['rname']."</b>");
+                $form_container->output_cell($row['rbeschr']);
+                $form_container->output_cell($laendera." (".$laenderb.")", array("class" => "align_center"));
+
+                // Optionen-Fach basteln
+                //erst pop up dafür bauen - danke an @Risuena
+                $popup = new PopupMenu("fcverw_".$row['rid'], "Optionen");
+                $popup->add_item(
+                    "Editieren",
+                    "index.php?module=config-fcverw&amp;action=edit_region&amp;rid=".$row['rid']
+                );
+                $popup->add_item(
+                    "Archivieren",
+                    "index.php?module=config-fcverw&amp;action=del_region&amp;rid=".$row['rid']
+                );
+                $form_container->output_cell($popup->fetch(), array("class" => "align_center"));
+
+                $form_container->construct_row(); // Reihe erstellen
             }
+            $form_container->end();
             
-            if ($db->insert_query("laender_info", $insert))
+            
+            $form_container = new FormContainer('Alle archivierten Regionen (in aktiven Kontinenten)');
+            $form_container->output_row_header('ehem. ID', array("class" => "align_center", "width" => "5%"));
+            $form_container->output_row_header('Regionenname', array("class" => "align_center", "width" => "25%"));
+            $form_container->output_row_header('Beschreibung', array("class" => "align_center"));
+            $form_container->output_row_header('L&auml;nder<br>aktiv (archiviert)', array("class" => "align_center", "width" => "10%"));
+            $form_container->output_row_header('Optionen', array("class" => "align_center", "width" => "15%"));
+
+            // Hier werden die aktiven Regionen ausgelesen
+            $fc_regsel2 = fcverw_KonReg(0, 1);
+            while ($row2 = $db->fetch_array($fc_regsel2))
             {
-                redirect("admin/index.php?module=config-fcverw");
+                // Auslesen der Anzahl der Regionen und Länder
+                $laendera2 = $db->num_rows($db->simple_select("laender", "landid", "lrid = ".$row2['rid']));
+                $laenderb2 = $db->num_rows($db->simple_select("laender_archive", "landid", "lrid = ".$row2['rid']));
+
+                $form_container->output_cell($row2['rid'], array("class" => "align_center"));
+                $form_container->output_cell("[".$row2['kname']."] <b>".$row2['rname']."</b>");
+                $form_container->output_cell($row2['rbeschr']);
+                $form_container->output_cell($laendera2." (".$laenderb2.")", array("class" => "align_center"));
+
+                // Optionen-Fach basteln
+                //erst pop up dafür bauen - danke an @Risuena
+                $popup2 = new PopupMenu("fcverw_".$row2['rid'], "Optionen");
+                $popup2->add_item(
+                    "Editieren",
+                    "index.php?module=config-fcverw&amp;action=edit_region&amp;rid=".$row2['rid']
+                );
+                $popup2->add_item(
+                    "Wiederherstellen",
+                    "index.php?module=config-fcverw&amp;action=re_region&amp;rid=".$row2['rid']
+                );
+                $form_container->output_cell($popup2->fetch(), array("class" => "align_center"));
+
+                $form_container->construct_row(); // Reihe erstellen
             }
+            $form_container->end();
             
-        }
-        else 
+            
+            $form_container = new FormContainer('Alle Regionen (in archivierten Kontinenten)');
+            $form_container->output_row_header('ehem. ID', array("class" => "align_center", "width" => "5%"));
+            $form_container->output_row_header('Regionenname', array("class" => "align_center", "width" => "25%"));
+            $form_container->output_row_header('Beschreibung', array("class" => "align_center"));
+            $form_container->output_row_header('L&auml;nder<br>aktiv (archiviert)', array("class" => "align_center", "width" => "10%"));
+            $form_container->output_row_header('Optionen', array("class" => "align_center", "width" => "15%"));
+
+
+            // Hier werden die Regionen in gelöschten Kontinenten ausgelesen
+            $fc_regsel3 = fcverw_KonReg(1, 2);
+            while ($row3 = $db->fetch_array($fc_regsel3))
+            {
+                // Auslesen der Anzahl der Regionen und Länder
+                $laendera3 = $db->num_rows($db->simple_select("laender", "landid", "lrid = ".$row3['rid']));
+                $laenderb3 = $db->num_rows($db->simple_select("laender_archive", "landid", "lrid = ".$row3['rid']));
+
+                $form_container->output_cell($row3['rid'], array("class" => "align_center"));
+                $form_container->output_cell("[".$row3['kname']."] <b>".$row3['rname']."</b>");
+                $form_container->output_cell($row3['rbeschr']);
+                $form_container->output_cell($laendera3." (".$laenderb3.")", array("class" => "align_center"));
+
+                // Optionen-Fach basteln
+                $form_container->output_cell("Bitte erst den Kontinent aktivieren!", array("class" => "align_center"));
+
+                $form_container->construct_row(); // Reihe erstellen
+            }
+            $form_container->end();
+            
+            
+            
+            $form->end();
+        } // Ende der Regionenübersicht
+
+
+
+
+/* *******************************************************************************************************************************************************************
+       b2. Neue Region anlegen
+******************************************************************************************************************************************************************* */
+
+        if ($mybb->input['action'] == "add_region")
         {
-            // Formular
-            $select = $db->simple_select("laender", "lname, lart", "landid = ".$landid);
-        
-            $data = $db->fetch_array($select);
-            
-            // Neues Tab kreieren, das nur während des Anzeigens vorhanden ist.
-            $sub_tabs['add_landinfo'] = array(
-                'title' => 'L&auml;nderinfo anlegen',
-                'link' => 'index.php?module=config-fcverw&amp;action=add_landinfo&amp;landid='.$landid,
-                'description' => 'Anlegen einer L&auml;nderinformation f&uuml;r: <b>'.$data['lart'].' '.$data['lname'].'</b>.'
-            );
-            
-            $page->add_breadcrumb_item('['.$data['lart'].' '.$data['lname'].'] Neue L&auml;nderinformation anlegen');
-            $page->output_header('L&auml;nderverwaltung - ['.$data['lart'].' '.$data['lname'].'] Neue L&auml;nderinformation anlegen');
-            
-            $page->output_nav_tabs($sub_tabs, 'add_landinfo');
-            
-            
-            // Jetzt die Daten anzeigen
-            $form = new Form("index.php?module=config-fcverw&amp;action=add_landinfo", "post", "", 1);
-            $form_container = new FormContainer('L&auml;nderinformation von '.$data['lart'].' '.$data['lname'].'</b>.');
-            
-            echo $form->generate_hidden_field('landid', $landid);
-            
-            foreach ($themen AS $thema => $lititel)
-            {            
+            // Wenn alle Pflichtangaben abgeschickt wurden, dann eintragen
+            if ($mybb->request_method == 'post' && $mybb->input['rname'] != '' && $mybb->input['rkid']!= '0')
+            {
+                $insert_query = array(
+                    'rkid' => (int)$mybb->input['rkid'],
+                    'rname' => htmlspecialchars_uni($mybb->input['rname']),
+                    'rbeschr' => htmlspecialchars_uni($mybb->input['rbeschr'])
+                );
+
+                if ($db->insert_query("laender_regionen", $insert_query))
+                {
+                    redirect("admin/index.php?module=config-fcverw&action=regionen");
+                }
+
+            }
+            else
+            {
+                // Wenn Regionenname leer, dann Fehldermeldung generieren!
+                if ((!$mybb->input['rname'] || $mybb->input['rname'] == '') && $mybb->request_method == 'post')
+                {
+                    $l_fehler = " <b><font color='#ff0000'>Der Regionenname muss ausgef&uuml;llt sein!</font></b>";
+                }
+                // Wenn Regionenkontinent leer, dann Fehlermeldung generieren!
+                if ((!$mybb->input['rkid'] || $mybb->input['rkid'] == '' || $mybb->input['rkid'] == '0') && $mybb->request_method == 'post')
+                {
+                    $k_fehler = " <b><font color='#ff000'>Es muss ein Kontinent zugeordnet werden!</font></b>";
+                }
+
+                $page->add_breadcrumb_item('Region anlegen');
+                $page->output_header('L&auml;nderverwaltung - Region anlegen');
+
+                // which tab is selected? hier: add_region
+                $page->output_nav_tabs($sub_tabs, 'add_region');
+
+                // Neues Formular erstellen
+                $form = new Form("index.php?module=config-fcverw&amp;action=add_region", "post", "", 1);
+                $form_container = new FormContainer('Neue Region anlegen');
+
+                // der name
                 $form_container->output_row(
-                    $lititel,
-                    $form->generate_text_area(
-                        $thema,
-                        $mybb->input[$thema],
-                        array('style' => 'width: 80%; height: 300px;')
+                    'Name der Region'.$l_fehler,
+                    'Vollst&auml;ndiger Name der Region',
+                    $form->generate_text_box(
+                        'rname',
+                        htmlspecialchars_uni($mybb->input['rname']),
+                        array('style' => 'width: 200px;')
                     )
                 );
-            }
-            
-            
-            $form_container->end();
-            $button[] = $form->generate_submit_button('Anlegen');
-            $form->output_submit_wrapper($button);
-            $form->end();
-            
-        }
-        
-        
-    } // Ende Länderinfos anzeigen
-
-
-
-/* *******************************************************************************************************************************************************************
-       d3. Aktuelle noch nicht freigegebene Länderinformation anzeigen
-******************************************************************************************************************************************************************* */
-
-    if ($mybb->input['action'] == 'control_landinfo')
-    {
-        // Daten der aktuell freigegebenen Version auslesen
-        $landid = (int)$mybb->input['landid'];
-        
-        // Wenn Formular abgesendet, dann ...
-        if ($mybb->request_method == 'post')
-        {
-            $linfoid = (int)$mybb->input['linfoid'];
-            
-            $update = array("lifreigabe" => "1");
-            
-            if ($db->update_query("laender_info", $update, "linfoid = ".$linfoid))
-            {
-                redirect("admin/index.php?module=config-fcverw");
-            }
-        }
-        else
-        {
-            $select = $db->write_query("
-                SELECT 
-                    li.*, l.lname, l.lart 
-                FROM 
-                    ".TABLE_PREFIX."laender_info li 
-                LEFT JOIN 
-                    ".TABLE_PREFIX."laender l 
-                ON 
-                    li.landid = l.landid 
-                WHERE 
-                    li.landid = ".$landid." 
-                        AND 
-                    li.lifreigabe = '0' 
-                ORDER BY 
-                    li.lidatum DESC 
-                LIMIT 1
-            ");
-            
-            $data = $db->fetch_array($select);
-            
-            // Neues Tab kreieren, das nur während des Anzeigens vorhanden ist.
-            $sub_tabs['control_landinfo'] = array(
-                'title' => 'L&auml;nderinfo kontrollieren',
-                'link' => 'index.php?module=config-fcverw&amp;action=control_landinfo&amp;landid='.$landid,
-                'description' => 'Anzeige der aktuellsten, noch nicht freigegebenen L&auml;nderinformation von <b>'.$data['lart'].' '.$data['lname'].'</b>.'
-            );
-            
-            $page->add_breadcrumb_item('['.$data['lart'].' '.$data['lname'].'] Noch nicht freigegebene L&auml;nderbeschreibung anzeigen');
-            $page->output_header('L&auml;nderverwaltung - ['.$data['lart'].' '.$data['lname'].'] Noch nicht freigegebene L&auml;nderbeschreibung anzeigen');
-            
-            $page->output_nav_tabs($sub_tabs, 'control_landinfo');
-            
-            
-            // Jetzt die Daten anzeigen
-            $form = new Form("index.php?module=config-fcverw&amp;action=control_landinfo", "post", "", 1);
-            $form_container = new FormContainer('L&auml;nderinformation von '.$data['lart'].' '.$data['lname'].'</b>.');
-            
-            echo $form->generate_hidden_field('linfoid', $data['linfoid']);
-            
-            foreach ($themen AS $thema => $lititel)
-            {
+                
+                // der zugeordnete Kontinent
+                // Kontinente auslesen
+                $kontsel = $db->simple_select("laender_kontinente", "*");
+                $kontinente = array();
+                $kontinente[0] = "Bitte w&auml;hlen!";
+                
+                while ($kontdata = $db->fetch_array($kontsel))
+                {
+                    $kontinente[$kontdata['kid']] = htmlspecialchars_uni($kontdata['kname']);
+                }
+                
                 $form_container->output_row(
-                    $lititel,
-                    '',
-                    '<div style="width: 75%; max-height: 300px; overflow: auto; margin-left: 60px; line-height: 1.6; padding: 10px;">'.nl2br($data[$thema]).'</div><br />'
-                );
-            }
-            
-            $form_container->end();
-            $button[] = $form->generate_submit_button('Freigeben');
-            $form->output_submit_wrapper($button);
-            $form->end();
-        
-        }
-        
-    } // Ende Länderinfos kontrollieren
-    
-    
-    
-
-/* *******************************************************************************************************************************************************************
-       d4. Schnelle Freigabe
-******************************************************************************************************************************************************************* */
-
-    if ($mybb->input['action'] == 'free_landinfo')
-    {
-        // Daten der aktuell freigegebenen Version auslesen
-        $linfoid = (int)$mybb->input['linfoid'];
-        
-        $update = array("lifreigabe" => "1");
-            
-        if ($db->update_query("laender_info", $update, "linfoid = ".$linfoid))
-        {
-            redirect("admin/index.php?module=config-fcverw");
-        }
-       
-        
-    } // Ende schnell freigeben
-    
-    
-
-
-/* *******************************************************************************************************************************************************************
-       d5. Neue Version
-******************************************************************************************************************************************************************* */
-
-    if ($mybb->input['action'] == 'new_landinfo')
-    {
-        // Daten der aktuell freigegebenen Version auslesen
-        $landid = (int)$mybb->input['landid'];
-        
-        
-        if ($mybb->request_method == 'post')
-        {
-            $landid = (int)$mybb->input['landid'];
-            
-            // Eintragen
-            $insert = array();
-            $insert['landid'] = $landid;
-            
-            foreach ($themen AS $thema => $lititel)
-            {
-                $insert[$thema] = $mybb->input[$thema];
-            }
-            
-            if ($db->insert_query("laender_info", $insert))
-            {
-                redirect("admin/index.php?module=config-fcverw");
-            }
-        }
-        else
-        {
-            
-            $select = $db->write_query("
-                SELECT 
-                    li.*, l.lname, l.lart 
-                FROM 
-                    ".TABLE_PREFIX."laender_info li 
-                LEFT JOIN 
-                    ".TABLE_PREFIX."laender l 
-                ON 
-                    li.landid = l.landid 
-                WHERE 
-                    li.landid = ".$landid." 
-                        AND 
-                    li.lifreigabe = '1' 
-                ORDER BY 
-                    li.lidatum DESC 
-                LIMIT 1
-            ");
-            
-            $data = $db->fetch_array($select);
-            
-            // Neues Tab kreieren, das nur während des Anzeigens vorhanden ist.
-            $sub_tabs['new_landinfo'] = array(
-                'title' => 'L&auml;nderinfo - Neue Version',
-                'link' => 'index.php?module=config-fcverw&amp;action=new_landinfo&amp;landid='.$landid,
-                'description' => 'Erstellung einer neuen Version der L&auml;nderinformation von <b>'.$data['lart'].' '.$data['lname'].'</b>.'
-            );
-            
-            $page->add_breadcrumb_item('['.$data['lart'].' '.$data['lname'].'] Neue Version der L&auml;nderbeschreibung anlegen');
-            $page->output_header('L&auml;nderverwaltung - ['.$data['lart'].' '.$data['lname'].'] Neue Version der L&auml;nderbeschreibung anlegen');
-            
-            $page->output_nav_tabs($sub_tabs, 'new_landinfo');
-            
-            
-            // Jetzt die Daten anzeigen
-            $form = new Form("index.php?module=config-fcverw&amp;action=new_landinfo", "post", "", 1);
-            $form_container = new FormContainer('L&auml;nderinformation von '.$data['lart'].' '.$data['lname'].'</b>.');
-            
-            echo $form->generate_hidden_field('landid', $landid);
-            
-            foreach ($themen AS $thema => $lititel)
-            {
-                $form_container->output_row(
-                    $lititel,
-                    $form->generate_text_area(
-                        $thema,
-                        $data[$thema],
-                        array('style' => 'width: 80%; height: 300px;')
+                    'Kontinent'.$k_fehler,
+                    'Zu welchem Kontinent geh&ouml;rt die Region?',
+                    $form->generate_select_box(
+                        'rkid',
+                        $kontinente,
+                        $mybb->input['rkid'], 
+                        array('style' => 'width: 200px;')
                     )
                 );
-            }
-            
-            $form_container->end();
-            $button[] = $form->generate_submit_button('Neue Version einreichen');
-            $form->output_submit_wrapper($button);
-            $form->end();
-            
-        }
-        
-       
-    } // Ende neue Version Länderinfo anlegen
-    
-    
-    
 
-/* *******************************************************************************************************************************************************************
-       d6. Alte Version und neue Version vergleichen
-******************************************************************************************************************************************************************* */
-
-    if ($mybb->input['action'] == 'vergl_landinfo')
-    {
-        // Daten der aktuell freigegebenen Version auslesen
-        $landid = (int)$mybb->input['landid'];
-        
-        // Aktive raussuchen
-        $select = $db->write_query("
-            SELECT 
-                li.*, l.lname, l.lart 
-            FROM 
-                ".TABLE_PREFIX."laender_info li 
-            LEFT JOIN 
-                ".TABLE_PREFIX."laender".$archivet." l 
-            ON 
-                li.landid = l.landid 
-            WHERE 
-                li.landid = ".$landid." 
-                    AND 
-                li.lifreigabe = '1' 
-            ORDER BY 
-                li.lidatum DESC 
-            LIMIT 1
-        ");
-        
-        // Neue raussuchen
-        $select2 = $db->simple_select("laender_info", "*", "lifreigabe = '0' AND landid = ".$landid, array("order_by" => "lidatum DESC", "limit" => "1"));
-        
-        $data = $db->fetch_array($select);
-        $data2 = $db->fetch_array($select2);
-        
-        
-        // Neues Tab kreieren, das nur während des Anzeigens vorhanden ist.
-        $sub_tabs['vergl_landinfo'] = array(
-            'title' => 'L&auml;nderinfo vergleichen',
-            'link' => 'index.php?module=config-fcverw&amp;action=show_landinfo&amp;landid='.$landid,
-            'description' => 'Vergleich der letzten freigegebenen Version und der neusten, noch freizugebenden Version der L&auml;nderinfo von <b>'.$data['lart'].' '.$data['lname'].'</b>.'
-        );
-        
-        $page->add_breadcrumb_item('['.$data['lart'].' '.$data['lname'].'] Vergleich der L&auml;nderbeschreibung');
-        $page->output_header('L&auml;nderverwaltung - ['.$data['lart'].' '.$data['lname'].'] Vergleich der L&auml;nderbeschreibung');
-        
-        $page->output_nav_tabs($sub_tabs, 'vergl_landinfo');
-        
-        
-        // Jetzt die Daten anzeigen
-        $form = new Form("index.php?module=config-fcverw&amp;action=vergl_landinfo", "post", "", 1);
-        $form_container = new FormContainer('L&auml;nderinformation von '.$data['lart'].' '.$data['lname'].'</b>.');
-        
-        $form_container->output_row_header('<b>Alte Version</b>', array("width" => "50%", "class" => "align_center"));
-        $form_container->output_row_header('<b>Neue Version</b>', array("class" => "align_center"));
-        
-        
-        foreach ($themen AS $thema => $lititel)
-        {
-            $diff = str_word_count($data2[$thema]) - str_word_count($data[$thema]);
-            
-            $form_container->output_cell('<b>'.$lititel.'</b> ('.$diff.' W&ouml;rter Unterschied)', array("colspan" => "2", "class" => "align_center"));
-            $form_container->construct_row();
-            
-            
-            $form_container->output_cell('<div style="width: 95%; max-height: 300px; overflow: auto; line-height: 1.6; padding: 10px;">'.nl2br($data[$thema]).'</div>');
-            $form_container->output_cell('<div style="width: 95%; max-height: 300px; overflow: auto; line-height: 1.6; padding: 10px;">'.nl2br($data2[$thema]).'</div>');
-            $form_container->construct_row();
-            
-        }
-        
-        $form_container->end();
-        $form->end();
-       
-    } // Ende Versionen vergleichen
-
-
-
-/* *******************************************************************************************************************************************************************
-       d7. Aktuelle Arbeitsversion editieren
-******************************************************************************************************************************************************************* */
-
-    if ($mybb->input['action'] == 'edit_landinfo')
-    {
-        // Daten der aktuell freigegebenen Version auslesen
-        $landid = (int)$mybb->input['landid'];
-        
-        
-        if ($mybb->request_method == 'post')
-        {
-            $linfoid = (int)$mybb->input['linfoid'];
-            
-            // Eintragen
-            $update = array();
-            
-            foreach ($themen AS $thema => $lititel)
-            {
-                $update[$thema] = $mybb->input[$thema];
-            }
-            
-            if ($db->update_query("laender_info", $update, "linfoid = ".$linfoid))
-            {
-                redirect("admin/index.php?module=config-fcverw");
-            }
-        }
-        else
-        {
-            
-            $select = $db->write_query("
-                SELECT 
-                    li.*, l.lname, l.lart 
-                FROM 
-                    ".TABLE_PREFIX."laender_info li 
-                LEFT JOIN 
-                    ".TABLE_PREFIX."laender l 
-                ON 
-                    li.landid = l.landid 
-                WHERE 
-                    li.landid = ".$landid." 
-                        AND 
-                    li.lifreigabe = '0' 
-                ORDER BY 
-                    li.lidatum DESC 
-                LIMIT 1
-            ");
-            
-            $data = $db->fetch_array($select);
-            
-            // Neues Tab kreieren, das nur während des Anzeigens vorhanden ist.
-            $sub_tabs['edit_landinfo'] = array(
-                'title' => 'L&auml;nderinfo - Arbeitsversion editieren',
-                'link' => 'index.php?module=config-fcverw&amp;action=edit_landinfo&amp;landid='.$landid,
-                'description' => 'Editieren der Arbeitsversion der L&auml;nderinformation von <b>'.$data['lart'].' '.$data['lname'].'</b>.'
-            );
-            
-            $page->add_breadcrumb_item('['.$data['lart'].' '.$data['lname'].'] Editierung der Arbeitsversion L&auml;nderbeschreibung');
-            $page->output_header('L&auml;nderverwaltung - ['.$data['lart'].' '.$data['lname'].'] Editierung der Arbeitsversion L&auml;nderbeschreibung');
-            
-            $page->output_nav_tabs($sub_tabs, 'edit_landinfo');
-            
-            
-            // Jetzt die Daten anzeigen
-            $form = new Form("index.php?module=config-fcverw&amp;action=edit_landinfo", "post", "", 1);
-            $form_container = new FormContainer('L&auml;nderinformation von '.$data['lart'].' '.$data['lname'].'</b>.');
-            
-            echo $form->generate_hidden_field('linfoid', $data['linfoid']);
-            
-            foreach ($themen AS $thema => $lititel)
-            {
+                // Informationstext
                 $form_container->output_row(
-                    $lititel,
+                    'Beschreibung',
+                    'Gibt es interessante Informationen &uuml;ber die Region?',
                     $form->generate_text_area(
-                        $thema,
-                        $data[$thema],
-                        array('style' => 'width: 80%; height: 300px;')
+                        'rbeschr',
+                        $db->escape_string($mybb->input['rbeschr'])
                     )
                 );
+
+                $form_container->end();
+                $button[] = $form->generate_submit_button('Region anlegen');
+                $form->output_submit_wrapper($button);
+                $form->end();
+            }   
+        } // Ende Region anlegen
+
+
+
+
+/* *******************************************************************************************************************************************************************
+       b3. Region bearbeiten
+******************************************************************************************************************************************************************* */
+
+        if ($mybb->input['action'] == "edit_region")
+        {
+            // Eintrag machen
+            if ($mybb->request_method == 'post' && $mybb->input['rname'] != '')
+            {
+                // Länder updaten
+                if ($mybb->input['rdelete'] == '1')
+                {
+                    // Länder updaten
+                    // Länder kopieren und löschen
+                    $landselect = $db->simple_select("laender", "*", "lrid = ".$mybb->input['rid'], array("order_by" => 'landid'));
+                    while ($landdata = $db->fetch_array($landselect))
+                    {
+                        $insert = array(
+                            "landid" => $landdata['landid'],
+                            "lkid" => $landdata['lkid'],
+                            "lrid" => $landdata['lrid'],
+                            "lname" => $landdata['lname'],
+                            "lkuerzel" => $landdata['lkuerzel'],
+                            "lart" => $landdata['lart'],
+                            "lreal" => $landdata['lreal'],
+                            "lbesp" => $landdata['lbesp'],
+                            "lstat" => $landdata['lstat'],
+                            "lparent" => $landdata['lparent'],
+                            "lverantw" => $landdata['lverantw']
+                        );
+                                    
+                        // Prüfen, ob das Land mit der LandID bereits vorhanden ist
+                        $probe = $db->simple_select("laender_archive", "*", "landid = ".$landdata['landid']);
+                        // Wenn Ergebnis = 0, dann eintragen - ansonsten nicht.
+                        if ($db->num_rows($probe) == '0')
+                        {
+                            $db->insert_query("laender_archive", $insert);
+                        }
+                                    
+                        // Hier in jedem Fall alle löschen.
+                        $db->delete_query("laender", "landid = ".$landdata['landid']);
+                    }
+        
+                }
+                
+                $update_query = array(
+                    'rkid' => (int)$mybb->input['rkid'],
+                    'rname' => htmlspecialchars_uni($mybb->input['rname']),
+                    'rbeschr' => htmlspecialchars_uni($mybb->input['rbeschr']),
+                    'rdelete' => (int)$mybb->input['rdelete']
+                );
+
+                if ($db->update_query("laender_regionen", $update_query, "rid = ".(int)$mybb->input['rid']))
+                {
+                    redirect("admin/index.php?module=config-fcverw&action=regionen");
+                }
+
+            }
+            else
+            {
+                // Formular anzeigen
+                // Neues Tab kreieren, das nur während des Editierens vorhanden ist.
+                $sub_tabs['edit_region'] = array(
+                    'title' => 'Region editieren',
+                    'link' => 'index.php?module=config-fcverw&amp;action=edit_region&amp;rid='.$mybb->input['rid'],
+                    'description' => 'Editieren einer bestehenden Region'
+                );
+
+                $page->add_breadcrumb_item('Region editieren');
+                $page->output_header('L&auml;nderverwaltung - Region editieren');
+
+                // which tab is selected? here: edit_region - der ist NICHT permanent!
+                $page->output_nav_tabs($sub_tabs, 'edit_region');
+
+                $form = new Form("index.php?module=config-fcverw&amp;action=edit_region", "post", "", 1);
+                $form_container = new FormContainer('Region editieren');
+                
+                // ID mitgeben über verstecktes Feld
+                echo $form->generate_hidden_field('rid', $mybb->input['rid']);
+
+                // Daten holen
+                $dataget = $db->simple_select("laender_regionen", "*", "rid = ".$mybb->input['rid']);
+                $data = $db->fetch_array($dataget);
+
+                // Fehlermeldung ausgeben, wenn Name nicht ausgefüllt
+                if ((!$mybb->input['rname'] || $mybb->input['rname'] == '') && $mybb->request_method == 'post')
+                {
+                    $l_fehler = " <b><font color='#ff0000'>Der Regionenname muss ausgef&uuml;llt sein!</font></b>";
+                    // Daten überschreiben
+                    $data['rname'] = $mybb->input['rname'];
+                    $data['rbeschr'] = $mybb->input['rbeschr'];
+                    $data['rkid'] = $mybb->input['rkid'];
+                }
+                // Fehlermeldung, wenn Kontinent nicht augefüllt
+                if ((!$mybb->input['rkid'] || $mybb->input['rkid'] == '' || $mybb->input['rkid'] == '0') && $mybb->request_method == 'post')
+                {
+                    $k_fehler = " <b><font color='#ff0000'>Es muss ein Kontinent ausgew&auml;hlt werden!</font></b>";
+                    // Daten überschreiben
+                    $data['rname'] = $mybb->input['rname'];
+                    $data['rbeschr'] = $mybb->input['rbeschr'];
+                    $data['rkid'] = $mybb->input['rkid'];
+                }
+
+
+                // der name
+                $form_container->output_row(
+                    'Name der Region'.$l_fehler,
+                    'Vollst&auml;ndiger Name der Region',
+                    $form->generate_text_box(
+                        'rname',
+                        htmlspecialchars_uni($data['rname']),
+                        array('style' => 'width: 200px;')
+                    )
+                );
+
+                // der zugeordnete Kontinent
+                // Kontinente auslesen
+                $kontsel = $db->simple_select("laender_kontinente", "*");
+                $kontinente = array();
+                $kontinente[0] = "Bitte w&auml;hlen!";
+                
+                while ($kontdata = $db->fetch_array($kontsel))
+                {
+                    $kontinente[$kontdata['kid']] = htmlspecialchars_uni($kontdata['kname']);
+                }
+                
+                $form_container->output_row(
+                    'Kontinent'.$k_fehler,
+                    'Zu welchem Kontinent geh&ouml;rt die Region?',
+                    $form->generate_select_box(
+                        'rkid',
+                        $kontinente,
+                        $data['rkid'], 
+                        array('style' => 'width: 200px;')
+                    )
+                );
+
+                // Informationstext
+                $form_container->output_row(
+                    'Beschreibung',
+                    'Gibt es interessante Informationen &uuml;ber die Region?',
+                    $form->generate_text_area(
+                        'rbeschr',
+                        $db->escape_string($data['rbeschr'])
+                    )
+                );
+                
+                if ($data['rdelete'] == '1')
+                {
+                    $rdelete[0] = "Wiederherstellen";
+                    $rdelete[1] = "Archivierung beibehalten";
+                    
+                    if ($mybb->input['rdelete'] == '')
+                    {
+                        $mybb->input['rdelete'] = $data['rdelete'];
+                    }
+                    
+                    // Gelöschtes Region wiederherstellen?
+                    $form_container->output_row(
+                        'Wiederherstellen',
+                        'Soll die archivierte Region wiederhergestellt werden?',
+                        $form->generate_select_box(
+                            'rdelete',
+                            $rdelete,
+                            $mybb->input['rdelete'], 
+                            array('style' => 'width: 200px;')
+                        )
+                    ); 
+                }
+                else 
+                {
+                    $rdelete[0] = "Nein";
+                    $rdelete[1] = "Ja";
+                    
+                    if ($mybb->input['rdelete'] == '')
+                    {
+                        $mybb->input['rdelete'] = $data['rdelete'];
+                    }
+                    
+                    // Gelöschtes Region wiederherstellen?
+                    $form_container->output_row(
+                        'Archivieren?',
+                        'Soll die Region archiviert werden?',
+                        $form->generate_select_box(
+                            'rdelete',
+                            $rdelete,
+                            $mybb->input['rdelete'], 
+                            array('style' => 'width: 200px;')
+                        )
+                    ); 
+                }
+                
+
+                $form_container->end();
+                $button[] = $form->generate_submit_button('Region editieren');
+                $form->output_submit_wrapper($button);
+                $form->end();
+            }
+        } // Ende Editieren Region
+
+
+
+
+/* *******************************************************************************************************************************************************************
+       b4. Region archivieren
+******************************************************************************************************************************************************************* */
+
+        if ($mybb->input['action'] == "del_region")
+        {
+            $rid = (int)$mybb->input['rid'];
+
+            // Länder updaten
+            // Länder kopieren und löschen
+            $landselect = $db->simple_select("laender", "*", "lrid = ".$mybb->input['rid'], array("order_by" => 'landid'));
+            while ($landdata = $db->fetch_array($landselect))
+            {
+                $insert = array(
+                    "landid" => $landdata['landid'],
+                    "lkid" => $landdata['lkid'],
+                    "lrid" => $landdata['lrid'],
+                    "lname" => $landdata['lname'],
+                    "lkuerzel" => $landdata['lkuerzel'],
+                    "lart" => $landdata['lart'],
+                    "lreal" => $landdata['lreal'],
+                    "lbesp" => $landdata['lbesp'],
+                    "lstat" => $landdata['lstat'],
+                    "lparent" => $landdata['lparent'],
+                    "lverantw" => $landdata['lverantw']
+                );
+                            
+                // Prüfen, ob das Land mit der LandID bereits vorhanden ist
+                $probe = $db->simple_select("laender_archive", "*", "landid = ".$landdata['landid']);
+                // Wenn Ergebnis = 0, dann eintragen - ansonsten nicht.
+                if ($db->num_rows($probe) == '0')
+                {
+                    $db->insert_query("laender_archive", $insert);
+                }
+                            
+                // Hier in jedem Fall alle löschen.
+                $db->delete_query("laender", "landid = ".$landdata['landid']);
+            }
+
+            // Eintrag abändern - Delete = 1
+            $update = array(
+                'rdelete' => '1'
+            );
+            
+            if ($db->update_query("laender_regionen", $update, "rid = ".$rid))
+            {
+                redirect("admin/index.php?module=config-fcverw&action=regionen");
             }
             
-            $form_container->end();
-            $button[] = $form->generate_submit_button('Arbeitsversion bearbeiten');
-            $form->output_submit_wrapper($button);
-            $form->end();
+        } // Ende Löschen Region
+
+
+
+/* *******************************************************************************************************************************************************************
+       b5. Region wiederherstellen
+******************************************************************************************************************************************************************* */
+
+        if ($mybb->input['action'] == "re_region")
+        {
+            $rid = (int)$mybb->input['rid'];
+
+            // Eintrag abändern - Delete = 0
+            $update = array(
+                'rdelete' => '0'
+            );
+
+            // Eintrag wiederherstellen
+            if ($db->update_query("laender_regionen", $update, "rid = ".$rid)) 
+            {
+                redirect("admin/index.php?module=config-fcverw&action=regionen");
+            }
             
-        }
-        
-       
-    } // Ende neue Version Länderinfo anlegen
+           
+
+        } // Ende Wiederherstellen Region
