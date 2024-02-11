@@ -1,10 +1,21 @@
 <?php
+    // Disallow direct access to this file for security reasons
+    if (!defined('IN_MYBB')) {
+        die('Direct initialization of this file is not allowed.<br /><br />
+            Please make sure IN_MYBB is defined.');
+    }
 
-// Disallow direct access to this file for security reasons
-if (!defined('IN_MYBB')) {
-    die('Direct initialization of this file is not allowed.<br /><br />
-        Please make sure IN_MYBB is defined.');
-}
+
+/* *******************************************************************************************************************************************************************
+       Inhalt Dokument b. Regionen
+******************************************************************************************************************************************************************* */
+
+    // 1. regionen - Anzeige aller Regionen
+    // 2. add_region - Neue Region anlegen
+    // 3. edit_region - Region editieren
+    // 4. del_region - Region archivieren
+    // 5. re_region - Region wiederherstellen
+
 
 
 /* *******************************************************************************************************************************************************************
@@ -131,6 +142,8 @@ if (!defined('IN_MYBB')) {
         } // Ende der Regionenübersicht
 
 
+
+
 /* *******************************************************************************************************************************************************************
        b2. Neue Region anlegen
 ******************************************************************************************************************************************************************* */
@@ -231,7 +244,6 @@ if (!defined('IN_MYBB')) {
 /* *******************************************************************************************************************************************************************
        b3. Region bearbeiten
 ******************************************************************************************************************************************************************* */
-
 
         if ($mybb->input['action'] == "edit_region")
         {
@@ -469,7 +481,7 @@ if (!defined('IN_MYBB')) {
                             
                 // Hier in jedem Fall alle löschen.
                 $db->delete_query("laender", "landid = ".$landdata['landid']);
-            }
+            } 
 
             // Eintrag abändern - Delete = 1
             $update = array(
