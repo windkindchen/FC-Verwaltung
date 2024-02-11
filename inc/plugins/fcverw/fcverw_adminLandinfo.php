@@ -7,6 +7,21 @@
 
 
 /* *******************************************************************************************************************************************************************
+       Inhalt Dokument d. Länderinfos
+******************************************************************************************************************************************************************* */
+
+    // 0. Unabhängige Variablen
+    // 1. show_landinfo
+    // 2. add_landinfo
+    // 3. control_landinfo
+    // 4. free_landinfo
+    // 5. new_landinfo
+    // 6. vergl_landinfo
+    // 7. edit_landinfo
+
+
+
+/* *******************************************************************************************************************************************************************
        d0. Unabhängige Variablen
 ******************************************************************************************************************************************************************* */
 
@@ -59,9 +74,9 @@
             WHERE 
                 li.landid = ".$landid." 
                     AND 
-                lifreigabe = '1' 
+                li.lifreigabe = '1' 
             ORDER BY 
-                lidatum DESC 
+                li.lidatum DESC 
             LIMIT 1
         ");
         
@@ -182,7 +197,7 @@
 
 
 /* *******************************************************************************************************************************************************************
-       d3. Aktuelle freigegebene Länderinformation anzeigen
+       d3. Aktuelle noch nicht freigegebene Länderinformation anzeigen
 ******************************************************************************************************************************************************************* */
 
     if ($mybb->input['action'] == 'control_landinfo')
@@ -216,9 +231,9 @@
                 WHERE 
                     li.landid = ".$landid." 
                         AND 
-                    lifreigabe = '0' 
+                    li.lifreigabe = '0' 
                 ORDER BY 
-                    lidatum DESC 
+                    li.lidatum DESC 
                 LIMIT 1
             ");
             
@@ -329,9 +344,9 @@
                 WHERE 
                     li.landid = ".$landid." 
                         AND 
-                    lifreigabe = '1' 
+                    li.lifreigabe = '1' 
                 ORDER BY 
-                    lidatum DESC 
+                    li.lidatum DESC 
                 LIMIT 1
             ");
             
@@ -382,7 +397,7 @@
     
 
 /* *******************************************************************************************************************************************************************
-       d5. Alte Version und neue Version vergleichen
+       d6. Alte Version und neue Version vergleichen
 ******************************************************************************************************************************************************************* */
 
     if ($mybb->input['action'] == 'vergl_landinfo')
@@ -455,3 +470,96 @@
         $form->end();
        
     } // Ende Versionen vergleichen
+
+
+
+/* *******************************************************************************************************************************************************************
+       d7. Aktuelle Arbeitsversion editieren
+******************************************************************************************************************************************************************* */
+
+    if ($mybb->input['action'] == 'edit_landinfo')
+    {
+        // Daten der aktuell freigegebenen Version auslesen
+        $landid = (int)$mybb->input['landid'];
+        
+        
+        if ($mybb->request_method == 'post')
+        {
+            $linfoid = (int)$mybb->input['linfoid'];
+            
+            // Eintragen
+            $update = array();
+            
+            foreach ($themen AS $thema => $lititel)
+            {
+                $update[$thema] = $mybb->input[$thema];
+            }
+            
+            if ($db->update_query("laender_info", $update, "linfoid = ".$linfoid))
+            {
+                redirect("admin/index.php?module=config-fcverw");
+            }
+        }
+        else
+        {
+            
+            $select = $db->write_query("
+                SELECT 
+                    li.*, l.lname, l.lart 
+                FROM 
+                    ".TABLE_PREFIX."laender_info li 
+                LEFT JOIN 
+                    ".TABLE_PREFIX."laender l 
+                ON 
+                    li.landid = l.landid 
+                WHERE 
+                    li.landid = ".$landid." 
+                        AND 
+                    li.lifreigabe = '0' 
+                ORDER BY 
+                    li.lidatum DESC 
+                LIMIT 1
+            ");
+            
+            $data = $db->fetch_array($select);
+            
+            // Neues Tab kreieren, das nur während des Anzeigens vorhanden ist.
+            $sub_tabs['edit_landinfo'] = array(
+                'title' => 'L&auml;nderinfo - Arbeitsversion editieren',
+                'link' => 'index.php?module=config-fcverw&amp;action=edit_landinfo&amp;landid='.$landid,
+                'description' => 'Editieren der Arbeitsversion der L&auml;nderinformation von <b>'.$data['lart'].' '.$data['lname'].'</b>.'
+            );
+            
+            $page->add_breadcrumb_item('['.$data['lart'].' '.$data['lname'].'] Editierung der Arbeitsversion L&auml;nderbeschreibung');
+            $page->output_header('L&auml;nderverwaltung - ['.$data['lart'].' '.$data['lname'].'] Editierung der Arbeitsversion L&auml;nderbeschreibung');
+            
+            $page->output_nav_tabs($sub_tabs, 'edit_landinfo');
+            
+            
+            // Jetzt die Daten anzeigen
+            $form = new Form("index.php?module=config-fcverw&amp;action=edit_landinfo", "post", "", 1);
+            $form_container = new FormContainer('L&auml;nderinformation von '.$data['lart'].' '.$data['lname'].'</b>.');
+            
+            echo $form->generate_hidden_field('linfoid', $data['linfoid']);
+            
+            foreach ($themen AS $thema => $lititel)
+            {
+                $form_container->output_row(
+                    $lititel,
+                    $form->generate_text_area(
+                        $thema,
+                        $data[$thema],
+                        array('style' => 'width: 80%; height: 300px;')
+                    )
+                );
+            }
+            
+            $form_container->end();
+            $button[] = $form->generate_submit_button('Arbeitsversion bearbeiten');
+            $form->output_submit_wrapper($button);
+            $form->end();
+            
+        }
+        
+       
+    } // Ende neue Version Länderinfo anlegen
