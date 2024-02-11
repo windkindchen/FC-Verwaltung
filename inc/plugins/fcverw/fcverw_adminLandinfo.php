@@ -281,4 +281,177 @@
         }
        
         
-    } // Ende Länderinfos kontrollieren
+    } // Ende schnell freigeben
+    
+    
+
+
+/* *******************************************************************************************************************************************************************
+       d5. Neue Version
+******************************************************************************************************************************************************************* */
+
+    if ($mybb->input['action'] == 'new_landinfo')
+    {
+        // Daten der aktuell freigegebenen Version auslesen
+        $landid = (int)$mybb->input['landid'];
+        
+        
+        if ($mybb->request_method == 'post')
+        {
+            $landid = (int)$mybb->input['landid'];
+            
+            // Eintragen
+            $insert = array();
+            $insert['landid'] = $landid;
+            
+            foreach ($themen AS $thema => $lititel)
+            {
+                $insert[$thema] = $mybb->input[$thema];
+            }
+            
+            if ($db->insert_query("laender_info", $insert))
+            {
+                redirect("admin/index.php?module=config-fcverw");
+            }
+        }
+        else
+        {
+            
+            $select = $db->write_query("
+                SELECT 
+                    li.*, l.lname, l.lart 
+                FROM 
+                    ".TABLE_PREFIX."laender_info li 
+                LEFT JOIN 
+                    ".TABLE_PREFIX."laender l 
+                ON 
+                    li.landid = l.landid 
+                WHERE 
+                    li.landid = ".$landid." 
+                        AND 
+                    lifreigabe = '1' 
+                ORDER BY 
+                    lidatum DESC 
+                LIMIT 1
+            ");
+            
+            $data = $db->fetch_array($select);
+            
+            // Neues Tab kreieren, das nur während des Anzeigens vorhanden ist.
+            $sub_tabs['new_landinfo'] = array(
+                'title' => 'L&auml;nderinfo - Neue Version',
+                'link' => 'index.php?module=config-fcverw&amp;action=new_landinfo&amp;landid='.$landid,
+                'description' => 'Erstellung einer neuen Version der L&auml;nderinformation von <b>'.$data['lart'].' '.$data['lname'].'</b>.'
+            );
+            
+            $page->add_breadcrumb_item('['.$data['lart'].' '.$data['lname'].'] Neue Version der L&auml;nderbeschreibung anlegen');
+            $page->output_header('L&auml;nderverwaltung - ['.$data['lart'].' '.$data['lname'].'] Neue Version der L&auml;nderbeschreibung anlegen');
+            
+            $page->output_nav_tabs($sub_tabs, 'new_landinfo');
+            
+            
+            // Jetzt die Daten anzeigen
+            $form = new Form("index.php?module=config-fcverw&amp;action=new_landinfo", "post", "", 1);
+            $form_container = new FormContainer('L&auml;nderinformation von '.$data['lart'].' '.$data['lname'].'</b>.');
+            
+            echo $form->generate_hidden_field('landid', $landid);
+            
+            foreach ($themen AS $thema => $lititel)
+            {
+                $form_container->output_row(
+                    $lititel,
+                    $form->generate_text_area(
+                        $thema,
+                        $data[$thema],
+                        array('style' => 'width: 80%; height: 300px;')
+                    )
+                );
+            }
+            
+            $form_container->end();
+            $button[] = $form->generate_submit_button('Neue Version einreichen');
+            $form->output_submit_wrapper($button);
+            $form->end();
+            
+        }
+        
+       
+    } // Ende neue Version Länderinfo anlegen
+    
+    
+    
+
+/* *******************************************************************************************************************************************************************
+       d5. Alte Version und neue Version vergleichen
+******************************************************************************************************************************************************************* */
+
+    if ($mybb->input['action'] == 'vergl_landinfo')
+    {
+        // Daten der aktuell freigegebenen Version auslesen
+        $landid = (int)$mybb->input['landid'];
+        
+        // Aktive raussuchen
+        $select = $db->write_query("
+            SELECT 
+                li.*, l.lname, l.lart 
+            FROM 
+                ".TABLE_PREFIX."laender_info li 
+            LEFT JOIN 
+                ".TABLE_PREFIX."laender".$archivet." l 
+            ON 
+                li.landid = l.landid 
+            WHERE 
+                li.landid = ".$landid." 
+                    AND 
+                li.lifreigabe = '1' 
+            ORDER BY 
+                li.lidatum DESC 
+            LIMIT 1
+        ");
+        
+        // Neue raussuchen
+        $select2 = $db->simple_select("laender_info", "*", "lifreigabe = '0' AND landid = ".$landid, array("order_by" => "lidatum DESC", "limit" => "1"));
+        
+        $data = $db->fetch_array($select);
+        $data2 = $db->fetch_array($select2);
+        
+        
+        // Neues Tab kreieren, das nur während des Anzeigens vorhanden ist.
+        $sub_tabs['vergl_landinfo'] = array(
+            'title' => 'L&auml;nderinfo vergleichen',
+            'link' => 'index.php?module=config-fcverw&amp;action=show_landinfo&amp;landid='.$landid,
+            'description' => 'Vergleich der letzten freigegebenen Version und der neusten, noch freizugebenden Version der L&auml;nderinfo von <b>'.$data['lart'].' '.$data['lname'].'</b>.'
+        );
+        
+        $page->add_breadcrumb_item('['.$data['lart'].' '.$data['lname'].'] Vergleich der L&auml;nderbeschreibung');
+        $page->output_header('L&auml;nderverwaltung - ['.$data['lart'].' '.$data['lname'].'] Vergleich der L&auml;nderbeschreibung');
+        
+        $page->output_nav_tabs($sub_tabs, 'vergl_landinfo');
+        
+        
+        // Jetzt die Daten anzeigen
+        $form = new Form("index.php?module=config-fcverw&amp;action=vergl_landinfo", "post", "", 1);
+        $form_container = new FormContainer('L&auml;nderinformation von '.$data['lart'].' '.$data['lname'].'</b>.');
+        
+        $form_container->output_row_header('<b>Alte Version</b>', array("width" => "50%", "class" => "align_center"));
+        $form_container->output_row_header('<b>Neue Version</b>', array("class" => "align_center"));
+        
+        
+        foreach ($themen AS $thema => $lititel)
+        {
+            $diff = str_word_count($data2[$thema]) - str_word_count($data[$thema]);
+            
+            $form_container->output_cell('<b>'.$lititel.'</b> ('.$diff.' W&ouml;rter Unterschied)', array("colspan" => "2", "class" => "align_center"));
+            $form_container->construct_row();
+            
+            
+            $form_container->output_cell('<div style="width: 95%; max-height: 300px; overflow: auto; line-height: 1.6; padding: 10px;">'.nl2br($data[$thema]).'</div>');
+            $form_container->output_cell('<div style="width: 95%; max-height: 300px; overflow: auto; line-height: 1.6; padding: 10px;">'.nl2br($data2[$thema]).'</div>');
+            $form_container->construct_row();
+            
+        }
+        
+        $form_container->end();
+        $form->end();
+       
+    } // Ende Versionen vergleichen
